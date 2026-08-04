@@ -79,17 +79,4 @@
   }
   window.addEventListener("scroll", updateProgress, { passive: true });
   updateProgress();
-
-  fetch("otelbin-links.json")
-    .then((res) => (res.ok ? res.json() : null))
-    .then((links) => {
-      if (!links) return;
-      document.querySelectorAll("[data-otelbin-link]").forEach((el) => {
-        const key = el.getAttribute("data-otelbin-link");
-        if (key && links[key]) el.setAttribute("href", links[key]);
-      });
-    })
-    .catch(() => {
-      /* otelbin-links.json optional offline */
-    });
 })();
