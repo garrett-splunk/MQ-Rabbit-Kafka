@@ -36,6 +36,7 @@
         <li><a href="#value" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">★</span> Splunk value adds</a></li>
         <li><a href="#architecture" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Architecture</a></li>
         <li><a href="#demo-script" class="sidebar-tree__link" data-step="1"><span class="sidebar-tree__num">1</span> Demo script</a></li>
+        <li><a href="#troubleshooting" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🔍</span> Troubleshooting playbook</a></li>
         <li><a href="#platform-mq" class="sidebar-tree__link" data-step="2"><span class="sidebar-tree__num">2</span> IBM MQ</a></li>
         <li><a href="#platform-kafka" class="sidebar-tree__link" data-step="3"><span class="sidebar-tree__num">3</span> Kafka</a></li>
         <li><a href="#platform-rabbit" class="sidebar-tree__link" data-step="4"><span class="sidebar-tree__num">4</span> RabbitMQ</a></li>
@@ -129,6 +130,11 @@
           <p class="callout__title">Value add — Complements IR360, does not replace it</p>
           <p>IR360 remains the capacity/planning tool for MQ estate. Splunk O11y is the <strong>real-time operations</strong> layer: alerting, incident drill-down, and cross-platform correlation with Kafka/RabbitMQ on AWS/Azure.</p>
         </div>
+
+        <div class="callout callout--troubleshoot">
+          <p class="callout__title">Troubleshooting value — Faster MTTR across platforms</p>
+          <p>Ops teams today chase the same symptoms in three places (MQ extension, Kafka extension, Rabbit extension). Splunk gives one <strong>symptom → metric → service → root cause</strong> path for backlog, lag, and scrape failures — with detectors that group by <code>queue</code>, <code>queue_manager</code>, or consumer group instead of rebuilding dashboards per platform.</p>
+        </div>
       </section>
 
       <section id="architecture">
@@ -159,6 +165,7 @@
       <section id="demo-script">
         <div class="step-meta"><span class="step-badge">Live demo</span><span class="step-time">~45 min</span></div>
         <h2>Demo script</h2>
+        <p class="muted">Each demo below includes <strong>exactly what to show</strong> in Splunk and <strong>troubleshooting value</strong> talking points. Use alongside the full <a href="#troubleshooting">Troubleshooting playbook</a>.</p>
 
         <h3>Demo 1 — Unified platform overview (10 min)</h3>
         <ol class="checklist">
@@ -168,9 +175,23 @@
         </ol>
         <div class="code-block">
           <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-traffic-all">Copy</button></div>
-          <pre><code id="cmd-traffic-all">bash scripts/load-traffic.sh 10 200          # MQ orders
+          <pre><code id="cmd-traffic-all">bash scripts/run-demo.sh                 # or load individually:
+bash scripts/load-traffic.sh 10 200          # MQ orders
 bash scripts/load-kafka-traffic.sh demo.orders 15
 bash scripts/load-rabbit-traffic.sh 10       # requires: pip install pika</code></pre>
+        </div>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — Metric Explorer (unified view)</p>
+          <ol class="show-steps">
+            <li><strong>Observability → Metric Explorer</strong></li>
+            <li>Global filter: <code>deployment.environment:messaging-demo-lab</code></li>
+            <li>Plot <code>ibm.mq.queue.depth</code> — dimension <code>queue = ORDER.REQ</code></li>
+            <li>Add a second plot: search metrics <code>kafka</code> (pick broker or topic series from kafkametrics)</li>
+            <li>Add a third: search <code>rabbitmq</code> (queue message count / publish rate)</li>
+            <li>Point out: <strong>one time range, one filter, three platforms</strong> — no extension switching</li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> During a Sev-2, the on-call engineer does not need to know which Dynatrace extension owns which signal. One tenant, one alert routing path, one runbook format.</p>
         </div>
 
         <h3>Demo 2 — MQ backlog incident (15 min) ★ highlight</h3>
@@ -182,9 +203,29 @@ bash scripts/load-rabbit-traffic.sh 10       # requires: pip install pika</code>
 # APM: producer PUT spans only — no consumer GET
 # Restore: docker compose start order-consumer</code></pre>
         </div>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — Backlog diagnosis (step by step)</p>
+          <ol class="show-steps">
+            <li><strong>Before incident:</strong> <code>ibm.mq.queue.depth</code> flat near zero on <code>ORDER.REQ</code></li>
+            <li>Run <code>demo-incident-mq-backlog.sh</code> (stops <code>order-consumer</code>)</li>
+            <li><strong>Metric Explorer:</strong> depth climbs; leave chart open ~60s so the slope is obvious</li>
+            <li><strong>APM → Services → order-producer:</strong> traces still show <code>mq.put.order</code> spans (producer healthy)</li>
+            <li><strong>APM → Services → order-consumer:</strong> no new <code>mq.get.order</code> spans (consumer absent)</li>
+            <li><strong>Service map:</strong> producer → MQ edge active; consumer side quiet — classic “messages accumulating” pattern</li>
+            <li><strong>Restore:</strong> <code>docker compose start order-consumer</code> — depth drains; narrate auto-resolver / “problem cleared”</li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> Separates <em>producer still sending</em> vs <em>consumer down/slow</em> vs <em>channel/QM issue</em> in under two minutes. Same question ops ask in Dynatrace MQ extension — Splunk adds jump from depth chart to APM without a second tool.</p>
+        </div>
+
+        <div class="callout callout--troubleshoot">
+          <p class="callout__title">Say this — Production-scale follow-on</p>
+          <p>“At thousands of queues, this detector groups by <code>queue_manager</code> and <code>queue</code> — top-N depth, not one dashboard per queue. IR360 still plans capacity; Splunk tells you <strong>which queue is on fire right now</strong> and <strong>which service stopped consuming</strong>.”</p>
+        </div>
+
         <div class="callout callout--tip">
           <p class="callout__title">Presenter note</p>
-          <p>After Thasthakir’s Dynatrace MQ extension demo, show the <strong>same symptom</strong> in Splunk using the mapping table below. Emphasize detector → trace drill-down as the Splunk differentiator.</p>
+          <p>After Thasthakir’s Dynatrace MQ extension demo, show the <strong>same symptom</strong> in Splunk using the <a href="#dynatrace-map">mapping table</a>. Emphasize detector → trace drill-down as the Splunk differentiator.</p>
         </div>
 
         <h3>Demo 3 — MQ application trace correlation (15 min)</h3>
@@ -202,18 +243,142 @@ curl -X POST http://localhost:8080/orders \
 echo "Correlation ID: ${CORR_ID}"</code></pre>
         </div>
 
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — Trace correlation for one order</p>
+          <ol class="show-steps">
+            <li><strong>APM → Traces</strong> — filter service <code>order-producer</code>, time last 15 min</li>
+            <li>Open a trace; expand <code>POST /orders</code> → <code>inventory.reserve</code> → <code>mq.put.order</code></li>
+            <li>Note span attributes: <code>mq.queue</code>, <code>correlation.id</code> (or <code>X-Correlation-Id</code> tag)</li>
+            <li>Search traces for the same correlation ID on <code>order-consumer</code> — separate trace tree with <code>mq.get.order</code></li>
+            <li><strong>Service map:</strong> highlight async path — HTTP sync leg + MQ async leg</li>
+            <li>Optional: <strong>Related Content</strong> from a depth spike → “show me traces during this window”</li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> When a business team reports “order 8842 failed,” you search by correlation ID instead of guessing which queue or consumer instance. Bridges <em>business symptom</em> → <em>infrastructure metric</em> → <em>exact span</em> — the gap Dynatrace service flow fills today.</p>
+        </div>
+
         <h3>Demo 4 — Kafka &amp; RabbitMQ at scale story (5 min)</h3>
         <p>No need to deep-dive every chart — show that metrics arrive and explain production rollout:</p>
         <ul>
           <li><strong>Kafka:</strong> collector deployed per cluster or as gateway; <code>kafkametrics</code> scrapes all brokers; MSK/Confluent = same receiver, different bootstrap URLs.</li>
           <li><strong>RabbitMQ:</strong> management plugin metrics; Amazon MQ exposes the same API pattern.</li>
         </ul>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — Kafka consumer lag &amp; Rabbit queue depth</p>
+          <ol class="show-steps">
+            <li><strong>Kafka:</strong> Metric Explorer → search <code>kafka.consumer</code> or <code>kafka.broker</code> (exact name varies by scraper) — show consumer group / partition activity after <code>load-kafka-traffic.sh</code></li>
+            <li>Narrate: “In prod, lag climbing on one group = same detector pattern as MQ depth”</li>
+            <li><strong>RabbitMQ:</strong> search <code>rabbitmq</code> metrics — queue ready messages on <code>demo.orders</code></li>
+            <li>Optional: open <a href="http://localhost:15672">RabbitMQ management UI</a> side-by-side to prove metrics match the broker UI</li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> AWS Amazon MQ and Azure Rabbit are opaque boxes to many teams — management API metrics via one collector means the same runbook as self-hosted. Kafka MSK: no custom agent per cluster if ADOT + Splunk exporter already runs in the mesh.</p>
+        </div>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>Troubleshooting playbook</h2>
+        <p class="muted">Exact Splunk views and value points for common messaging incidents. Use as a presenter crib sheet or leave-behind for ops architects.</p>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">Universal flow (all platforms)</p>
+          <p><strong>Alert / user report → Metric (symptom) → APM or broker metric (scope) → Change or dependency (cause)</strong>. Splunk keeps metrics and traces in one product so you do not lose context switching between extension UIs.</p>
+        </div>
+
+        <table class="info-table">
+          <thead>
+            <tr><th>Symptom</th><th>What to show in Splunk</th><th>What it tells you</th><th>Troubleshooting value vs today</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="platform-badge platform-badge--mq">MQ</span> Queue backlog</td>
+              <td><code>ibm.mq.queue.depth</code> ↑ · filter <code>queue=ORDER.REQ</code></td>
+              <td>Messages accumulating faster than consumed</td>
+              <td>Same as Dynatrace MQ extension depth view — plus APM drill to see if PUT continues without GET</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--mq">MQ</span> Consumer stopped</td>
+              <td>APM: <code>order-consumer</code> — no <code>mq.get.order</code> spans; producer still has PUT</td>
+              <td>App/process down, not MQ infrastructure</td>
+              <td>Avoids false escalation to MQ admins; route to app team with trace evidence</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--mq">MQ</span> Scrape gap</td>
+              <td><code>ibm.mq.*</code> metrics flatline; check collector / sidecar health</td>
+              <td>Observability blind spot — not necessarily MQ outage</td>
+              <td>Detector on “no data” prevents silent failure during real incidents</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--kafka">Kafka</span> Consumer lag</td>
+              <td>kafkametrics consumer group lag / offset metrics</td>
+              <td>Consumers slower than producers or stuck</td>
+              <td>Same lag story as Dynatrace Kafka extension — unified alert with MQ/Rabbit in one on-call queue</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--kafka">Kafka</span> Broker pressure</td>
+              <td>Broker byte in/out, partition count, under-replicated partitions (if exposed)</td>
+              <td>Cluster capacity or broker failure</td>
+              <td>MSK/Confluent: point collector at bootstrap — no second monitoring stack</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--rmq">RMQ</span> Queue growth</td>
+              <td>rabbitmq queue messages ready / unacked</td>
+              <td>Consumers absent, slow, or nacking</td>
+              <td>Amazon MQ: identical management API — same dashboards in AWS and colo</td>
+            </tr>
+            <tr>
+              <td>Cross-platform incident</td>
+              <td>Metric Explorer with <code>deployment.environment</code> only — overlay MQ + Kafka + Rabbit</td>
+              <td>Correlated surge (e.g. upstream replay hitting all buses)</td>
+              <td>Impossible with siloed extensions without manual timestamp correlation</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Detector templates to mention (not live-built)</h3>
+        <div class="trouble-grid">
+          <details open>
+            <summary>MQ — sustained queue depth</summary>
+            <p><strong>Show:</strong> Create detector on <code>ibm.mq.queue.depth</code> — mean &gt; threshold for 5m, group by <code>queue</code>, <code>queue_manager</code>.<br>
+            <strong>Value:</strong> Fires before clients time out; routes to team owning the consumer service via APM service tags.</p>
+          </details>
+          <details>
+            <summary>MQ — metric absent (sidecar down)</summary>
+            <p><strong>Show:</strong> “No data” detector on key <code>ibm.mq.queue.depth</code> series per QM.<br>
+            <strong>Value:</strong> Prevents “everything looks fine” when the Java Contrib sidecar or network path failed.</p>
+          </details>
+          <details>
+            <summary>Kafka — consumer lag</summary>
+            <p><strong>Show:</strong> Lag metric from kafkametrics grouped by <code>consumer.group</code> and <code>topic</code>.<br>
+            <strong>Value:</strong> Same runbook as MQ backlog — different metric name, same Splunk incident workflow.</p>
+          </details>
+          <details>
+            <summary>RabbitMQ — ready messages high</summary>
+            <p><strong>Show:</strong> Queue ready count on critical queues (payments, settlements).<br>
+            <strong>Value:</strong> Cloud teams already know queue depth from AWS console — Splunk centralizes with MQ/Kafka for hybrid estate.</p>
+          </details>
+        </div>
+
+        <div class="callout callout--troubleshoot">
+          <p class="callout__title">Pair with Dynatrace demo — closing line</p>
+          <p>“You keep your IR360 and existing runbooks. Splunk does not ask you to rip out what works — it gives you <strong>one place to troubleshoot</strong> when an alert fires across MQ, Kafka, and Rabbit, with OpenTelemetry so you are not locked into per-platform agents forever.”</p>
+        </div>
       </section>
 
       <section id="platform-mq">
         <div class="step-meta"><span class="step-badge">IBM MQ</span></div>
         <h2>IBM MQ — primary platform</h2>
         <p>Java Contrib sidecar scrapes PCF every 15s. Sample order apps provide realistic APM edges (inventory + MQ PUT/GET).</p>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — MQ-specific Splunk views</p>
+          <ol class="show-steps">
+            <li><strong>Metrics:</strong> <code>ibm.mq.queue.depth</code>, <code>ibm.mq.queue.manager</code> health series — group by <code>queue_manager</code>, <code>queue</code></li>
+            <li><strong>APM services:</strong> <code>order-producer</code>, <code>order-consumer</code> — span names <code>mq.put.order</code>, <code>mq.get.order</code></li>
+            <li><strong>MQ console (optional):</strong> <a href="http://localhost:9443/ibmmq/console">localhost:9443</a> — prove queue depth matches Splunk metric</li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> Primary platform for the customer — prove Splunk matches what they trust in Dynatrace MQ extension, then show trace correlation Dynatrace cannot unify with Kafka/Rabbit in one backend.</p>
+        </div>
+
         <div class="callout callout--info">
           <p class="callout__title">Production note</p>
           <p>At scale (thousands of queues), use metric dimensions for top-N dashboards and detectors. IBM <code>mq_otel</code> (in-process bindings) is an alternative when sidecars are not desired — see <a href="https://garrett-splunk.github.io/MQ-O11y-Workshop/" target="_blank" rel="noopener">MQ-O11y-Workshop</a>.</p>
@@ -225,6 +390,16 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         <h2>Kafka</h2>
         <p>Single-node KRaft broker in Compose. Collector uses the <a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/kafka-metrics-receiver" target="_blank" rel="noopener">kafkametrics</a> receiver (brokers, topics, consumers scrapers).</p>
         <p><strong>Managed deployments:</strong> Amazon MSK, Confluent Cloud, and self-hosted Kafka all expose broker APIs the receiver can scrape — collector runs in ECS/EKS/EC2 alongside existing ADOT agents.</p>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — Kafka troubleshooting signals</p>
+          <ol class="show-steps">
+            <li>After <code>load-kafka-traffic.sh</code>, Metric Explorer → metrics containing <code>kafka</code></li>
+            <li>Highlight broker throughput and topic/partition activity (exact metric names from kafkametrics scraper)</li>
+            <li>Mention consumer group lag as the Kafka equivalent of <code>ibm.mq.queue.depth</code></li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> 100+ Kafka instances today = 100+ extension configs. One collector config pattern per cluster, exported to the same Splunk detectors and on-call rotation as MQ.</p>
+        </div>
       </section>
 
       <section id="platform-rabbit">
@@ -233,6 +408,16 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         <p>Management plugin on port 15672. Collector <a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/rabbitmq-receiver" target="_blank" rel="noopener">rabbitmq receiver</a> polls queue and node stats.</p>
         <p><strong>Cloud:</strong> AWS Amazon MQ and Azure-hosted RabbitMQ expose the same management API pattern — point the receiver at the managed endpoint with appropriate credentials.</p>
         <p class="muted"><strong>ActiveMQ</strong> follow-on: JMX → OTel JMX receiver or Prometheus JMX exporter → collector scrape. Not in this Compose stack.</p>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — RabbitMQ troubleshooting signals</p>
+          <ol class="show-steps">
+            <li>Metric Explorer → <code>rabbitmq</code> metrics on queue <code>demo.orders</code></li>
+            <li>Compare to <a href="http://localhost:15672">management UI</a> (demo / passw0rd) — messages ready vs Splunk chart</li>
+            <li>Narrate publish/deliver rates for “stuck consumer” vs “broker down” (node metrics absent)</li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> Hybrid AWS + colo Rabbit — same receiver and Splunk dashboards; ops do not maintain a separate Dynatrace extension lifecycle for cloud vs on-prem.</p>
+        </div>
       </section>
 
       <section id="dynatrace-map">
@@ -254,14 +439,17 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
 
       <section id="splunk-views">
         <h2>Splunk cheat sheet</h2>
+        <p class="muted">Copy-paste filters during live demos. Pair each row with the <a href="#troubleshooting">playbook</a> “what it tells you” column.</p>
         <table class="info-table">
-          <thead><tr><th>View</th><th>Filter / search</th></tr></thead>
+          <thead><tr><th>View</th><th>Filter / search</th><th>When to use (troubleshooting)</th></tr></thead>
           <tbody>
-            <tr><td>Environment</td><td><code>deployment.environment:messaging-demo-lab</code></td></tr>
-            <tr><td>MQ depth</td><td>Metric: <code>ibm.mq.queue.depth</code> · dimension <code>queue = ORDER.REQ</code></td></tr>
-            <tr><td>APM services</td><td><code>order-producer</code>, <code>order-consumer</code>, <code>inventory-service</code></td></tr>
-            <tr><td>Kafka</td><td>Search metrics containing <code>kafka</code> (broker / consumer group series from kafkametrics)</td></tr>
-            <tr><td>RabbitMQ</td><td>Search metrics containing <code>rabbitmq</code></td></tr>
+            <tr><td>Environment</td><td><code>deployment.environment:messaging-demo-lab</code></td><td>Always — scopes all demos to this stack</td></tr>
+            <tr><td>MQ depth</td><td>Metric: <code>ibm.mq.queue.depth</code> · dimension <code>queue = ORDER.REQ</code></td><td>Backlog incidents, capacity warnings</td></tr>
+            <tr><td>MQ APM — producer</td><td>Service <code>order-producer</code> · span <code>mq.put.order</code></td><td>Confirm upstream still publishing</td></tr>
+            <tr><td>MQ APM — consumer</td><td>Service <code>order-consumer</code> · span <code>mq.get.order</code></td><td>Confirm downstream consuming; absence = app issue</td></tr>
+            <tr><td>Trace by business ID</td><td>APM Traces · tag <code>correlation.id</code> or search correlation header value</td><td>“Order X failed” — find exact path</td></tr>
+            <tr><td>Kafka</td><td>Search metrics containing <code>kafka</code> (broker / consumer group series from kafkametrics)</td><td>Lag, broker health, replay storms</td></tr>
+            <tr><td>RabbitMQ</td><td>Search metrics containing <code>rabbitmq</code></td><td>Queue growth, node down, rate anomalies</td></tr>
           </tbody>
         </table>
       </section>
@@ -277,10 +465,8 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
               <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-start">Copy</button></div>
               <pre><code id="cmd-start">git clone https://github.com/garrett-splunk/MQ-Rabbit-Kafka.git
 cd MQ-Rabbit-Kafka
-cp .env.example .env
 cp .env.splunk.example .env.splunk   # add Splunk ingest token
-docker compose up --build -d
-bash scripts/verify-stack.sh</code></pre>
+bash scripts/run-demo.sh             # build, start, verify, load traffic</code></pre>
             </div>
             <p>Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>
           </div>

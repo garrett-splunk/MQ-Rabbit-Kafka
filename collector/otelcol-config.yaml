@@ -16,7 +16,7 @@ receivers:
 
   kafkametrics:
     brokers:
-      - kafka:9092
+      - kafka:19092
     protocol_version: 3.6.0
     scrapers:
       - brokers

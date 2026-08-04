@@ -4,11 +4,14 @@ set -euo pipefail
 TOPIC="${1:-demo.orders}"
 COUNT="${2:-20}"
 
-docker compose exec -T kafka kafka-topics.sh --bootstrap-server localhost:9092 \
+KAFKA="/opt/kafka/bin/kafka-topics.sh"
+PRODUCER="/opt/kafka/bin/kafka-console-producer.sh"
+
+docker compose exec -T kafka "$KAFKA" --bootstrap-server localhost:9092 \
   --create --if-not-exists --topic "$TOPIC" --partitions 1 --replication-factor 1 2>/dev/null || true
 
 for i in $(seq 1 "$COUNT"); do
-  echo "demo-order-$i" | docker compose exec -T kafka kafka-console-producer.sh \
+  echo "demo-order-$i" | docker compose exec -T kafka "$PRODUCER" \
     --bootstrap-server localhost:9092 --topic "$TOPIC" >/dev/null 2>&1
 done
 

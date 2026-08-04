@@ -15,8 +15,15 @@ Presenter demo for enterprise customers running multiple messaging platforms (of
 ```bash
 git clone https://github.com/garrett-splunk/MQ-Rabbit-Kafka.git
 cd MQ-Rabbit-Kafka
+cp .env.splunk.example .env.splunk   # add Splunk ingest token (optional for local UI only)
+bash scripts/run-demo.sh             # build, start, verify, load MQ + Kafka + Rabbit traffic
+```
+
+Or step by step:
+
+```bash
 cp .env.example .env
-cp .env.splunk.example .env.splunk   # Splunk ingest token
+cp .env.splunk.example .env.splunk
 docker compose up --build -d
 bash scripts/verify-stack.sh
 ```
