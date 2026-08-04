@@ -151,7 +151,13 @@
           <div class="flow-arrow"><span>→</span></div>
           <div class="flow-node"><div class="flow-title">Splunk O11y</div><div class="flow-sub">Metrics · APM · detectors</div></div>
         </div>
-        <p><strong>Splunk filter:</strong> <code>deployment.environment:messaging-demo-lab</code></p>
+        <p><strong>Splunk filter:</strong> <code>deployment.environment.name:messaging-demo-lab</code></p>
+        <div class="callout callout--warning">
+          <p class="callout__title">Gotcha — Metric Explorer filter field</p>
+          <p>In Splunk Observability Cloud Metric Explorer, the global filter often needs <strong><code>deployment.environment.name</code></strong>, not <code>deployment.environment</code>:</p>
+          <p><code>deployment.environment.name:messaging-demo-lab</code></p>
+          <p class="muted">Both attributes are set on exported data from this demo, but the UI filter picker may only match on <code>.name</code>. If you see no charts, try that filter first before troubleshooting ingest.</p>
+        </div>
         <table class="info-table">
           <thead><tr><th>Signal</th><th>Source</th><th>Key metrics / views</th></tr></thead>
           <tbody>
@@ -186,7 +192,7 @@ bash scripts/load-rabbit-traffic.sh 10       # requires: pip install pika</code>
           <p class="callout__title">Show this — Metric Explorer (unified view)</p>
           <ol class="show-steps">
             <li><strong>Observability → Metric Explorer</strong></li>
-            <li>Global filter: <code>deployment.environment:messaging-demo-lab</code></li>
+            <li>Global filter: <code>deployment.environment.name:messaging-demo-lab</code></li>
             <li>Plot <code>ibm.mq.queue.depth</code> — dimension <code>queue = ORDER.REQ</code></li>
             <li>Add a second plot: search metrics <code>kafka</code> (pick broker or topic series from kafkametrics)</li>
             <li>Add a third: search <code>rabbitmq</code> (queue message count / publish rate)</li>
@@ -328,7 +334,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
             </tr>
             <tr>
               <td>Cross-platform incident</td>
-              <td>Metric Explorer with <code>deployment.environment</code> only — overlay MQ + Kafka + Rabbit</td>
+              <td>Metric Explorer with <code>deployment.environment.name:messaging-demo-lab</code> — overlay MQ + Kafka + Rabbit</td>
               <td>Correlated surge (e.g. upstream replay hitting all buses)</td>
               <td>Impossible with siloed extensions without manual timestamp correlation</td>
             </tr>
@@ -441,10 +447,18 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
       <section id="splunk-views">
         <h2>Splunk cheat sheet</h2>
         <p class="muted">Copy-paste filters during live demos. Pair each row with the <a href="#troubleshooting">playbook</a> “what it tells you” column.</p>
+
+        <div class="callout callout--warning">
+          <p class="callout__title">Gotcha — use <code>deployment.environment.name</code></p>
+          <p>Metric Explorer global filter: <strong><code>deployment.environment.name:messaging-demo-lab</code></strong></p>
+          <p>Do not assume <code>deployment.environment:messaging-demo-lab</code> works in the UI — Splunk often indexes/filters on the <code>.name</code> dimension for environment scoping. APM service views may accept either; start with <code>.name</code> if metrics look empty.</p>
+        </div>
+
         <table class="info-table">
           <thead><tr><th>View</th><th>Filter / search</th><th>When to use (troubleshooting)</th></tr></thead>
           <tbody>
-            <tr><td>Environment</td><td><code>deployment.environment:messaging-demo-lab</code></td><td>Always — scopes all demos to this stack</td></tr>
+            <tr><td>Environment (metrics)</td><td><code>deployment.environment.name:messaging-demo-lab</code></td><td>Always — scopes Metric Explorer to this stack</td></tr>
+            <tr><td>Environment (APM)</td><td><code>deployment.environment:messaging-demo-lab</code> or <code>deployment.environment.name:messaging-demo-lab</code></td><td>Service map / traces if needed</td></tr>
             <tr><td>MQ depth</td><td>Metric: <code>ibm.mq.queue.depth</code> · dimension <code>queue = ORDER.REQ</code></td><td>Backlog incidents, capacity warnings</td></tr>
             <tr><td>MQ APM — producer</td><td>Service <code>order-producer</code> · span <code>mq.put.order</code></td><td>Confirm upstream still publishing</td></tr>
             <tr><td>MQ APM — consumer</td><td>Service <code>order-consumer</code> · span <code>mq.get.order</code></td><td>Confirm downstream consuming; absence = app issue</td></tr>
@@ -505,7 +519,7 @@ docker compose logs otel-collector --tail 20</code></pre>
         <h3>Step 5 — Confirm data in Splunk</h3>
         <ol class="checklist">
           <li>Run <code>bash scripts/run-demo.sh</code> or load traffic scripts</li>
-          <li><strong>Metric Explorer</strong> → filter <code>deployment.environment:messaging-demo-lab</code></li>
+          <li><strong>Metric Explorer</strong> → filter <code>deployment.environment.name:messaging-demo-lab</code></li>
           <li>Search <code>ibm.mq.queue.depth</code>, <code>kafka</code>, or <code>rabbitmq</code></li>
           <li><strong>APM</strong> → services <code>order-producer</code>, <code>order-consumer</code>, <code>inventory-service</code></li>
         </ol>
