@@ -72,7 +72,7 @@ bash scripts/verify-stack.sh
 bash scripts/load-traffic.sh 10 200              # MQ orders
 bash scripts/demo-incident-mq-backlog.sh         # stop consumer → depth alert story
 bash scripts/load-kafka-traffic.sh demo.orders 15
-bash scripts/load-rabbit-traffic.sh 10           # pip install pika
+bash scripts/load-rabbit-traffic.sh 10           # uses curl + management API (no pika)
 ```
 
 ## GitHub Pages

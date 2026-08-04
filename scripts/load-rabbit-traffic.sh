@@ -1,25 +1,29 @@
 #!/usr/bin/env bash
-# Publish sample messages to RabbitMQ demo queue (requires pika: pip install pika)
+# Publish sample messages to RabbitMQ demo queue via management API (no pika required)
 set -euo pipefail
+
 COUNT="${1:-10}"
 QUEUE="${RABBITMQ_QUEUE:-demo.orders}"
 HOST="${RABBITMQ_HOST:-localhost}"
-PORT="${RABBITMQ_PORT:-5672}"
+PORT="${RABBITMQ_MGMT_PORT:-15672}"
 USER="${RABBITMQ_USER:-demo}"
 PASS="${RABBITMQ_PASSWORD:-passw0rd}"
+VHOST="%2F"
 
-python3 - <<PY
-import os, pika
-count = int("${COUNT}")
-queue = "${QUEUE}"
-creds = pika.PlainCredentials("${USER}", "${PASS}")
-conn = pika.BlockingConnection(pika.ConnectionParameters(host="${HOST}", port=int("${PORT}"), credentials=creds))
-ch = conn.channel()
-ch.queue_declare(queue=queue, durable=True)
-for i in range(count):
-    ch.basic_publish(exchange="", routing_key=queue, body=f"demo-order-{i}".encode())
-    print(f"published demo-order-{i}")
-conn.close()
-PY
+BASE="http://${HOST}:${PORT}/api"
+AUTH="${USER}:${PASS}"
 
+echo "Declaring queue ${QUEUE}..."
+curl -sf -u "${AUTH}" -X PUT "${BASE}/queues/${VHOST}/${QUEUE}" \
+  -H "Content-Type: application/json" \
+  -d '{"durable":true,"auto_delete":false}' >/dev/null
+
+for i in $(seq 0 $((COUNT - 1))); do
+  curl -sf -u "${AUTH}" -X POST "${BASE}/exchanges/${VHOST}/amq.default/publish" \
+    -H "Content-Type: application/json" \
+    -d "{\"properties\":{},\"routing_key\":\"${QUEUE}\",\"payload\":\"demo-order-${i}\",\"payload_encoding\":\"string\"}" >/dev/null
+  echo "published demo-order-${i}"
+done
+
+echo "Produced ${COUNT} messages to queue ${QUEUE}"
 echo "RabbitMQ metrics update within ~15s (rabbitmq receiver scrape interval)"

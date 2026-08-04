@@ -126,10 +126,6 @@ else
 
   echo
   echo "== Loading RabbitMQ traffic (${RABBIT_COUNT} messages) =="
-  if ! python3 -c "import pika" 2>/dev/null; then
-    echo "Installing pika (pip) for RabbitMQ publish script..."
-    python3 -m pip install --user pika -q
-  fi
   bash scripts/load-rabbit-traffic.sh "$RABBIT_COUNT"
 fi
 

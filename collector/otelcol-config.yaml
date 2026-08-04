@@ -83,4 +83,4 @@ service:
     metrics:
       receivers: [otlp, kafkametrics, rabbitmq]
       processors: [memory_limiter, resource/add_environment, transform/mq_metrics_environment, batch]
-      exporters: [otlphttp/metrics, debug]
+      exporters: [signalfx, otlphttp/metrics, debug]

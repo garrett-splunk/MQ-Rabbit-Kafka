@@ -43,6 +43,7 @@
         <li><a href="#dynatrace-map" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Dynatrace mapping</a></li>
         <li><a href="#splunk-views" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Splunk cheat sheet</a></li>
         <li><a href="#facilitator-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⚙</span> Facilitator setup</a></li>
+        <li><a href="#platform-uis" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🖥</span> Platform UIs</a></li>
         <li><a href="#splunk-token" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🔑</span> Splunk token</a></li>
       </ul>
       <div class="sidebar-footer">
@@ -459,9 +460,9 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
           <ol class="show-steps">
             <li><strong>Same token path as traces:</strong> metrics export via OTLP HTTP to <code>/v2/datapoint/otlp</code> (traces use <code>/v2/trace/otlp</code>). After changing <code>.env.splunk</code>, run <code>docker compose up -d otel-collector</code>.</li>
             <li><strong>Restart MQ metrics sidecar:</strong> <code>docker compose restart ibm-mq-java-metrics</code> — it logs <code>Exporter failed</code> if the collector was down when it started.</li>
-            <li><strong>Metric names differ from docs:</strong> search Metric Explorer for <code>ibm.mq</code>, <code>kafka</code>, <code>rabbitmq</code>, or Rabbit series like <code>gauge.queue.messages_ready</code> — not always the literal OTel names.</li>
-            <li><strong>Wait 1–2 min</strong> after <code>run-demo.sh</code> (Kafka scrapes every 30s, Rabbit every 15s, MQ every 15s).</li>
-            <li><strong>Try without filter</strong> first to confirm ingest, then add <code>deployment.environment.name:messaging-demo-lab</code>.</li>
+            <li><strong>Metric names differ from docs:</strong> MQ = <code>ibm.mq.queue.depth</code>; Rabbit = <code>rabbitmq.message.current</code> (not <code>gauge.queue.*</code> from other integrations); Kafka = <code>kafka.broker.*</code> / <code>kafka.topic.*</code>.</li>
+            <li><strong>Rabbit needs a queue:</strong> run <code>bash scripts/load-rabbit-traffic.sh 10</code> — empty Rabbit has no queue-level metrics.</li>
+            <li><strong>MQ sidecar:</strong> if logs show <code>Exporter failed</code>, run <code>docker compose up -d --build ibm-mq-java-metrics otel-collector</code> (sidecar now waits for collector on startup).</li>
           </ol>
         </div>
 
@@ -470,14 +471,74 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
           <tbody>
             <tr><td>Environment (metrics)</td><td><code>deployment.environment.name:messaging-demo-lab</code></td><td>Always — scopes Metric Explorer to this stack</td></tr>
             <tr><td>Environment (APM)</td><td><code>deployment.environment:messaging-demo-lab</code> or <code>deployment.environment.name:messaging-demo-lab</code></td><td>Service map / traces if needed</td></tr>
-            <tr><td>MQ depth</td><td>Metric: <code>ibm.mq.queue.depth</code> · dimension <code>queue = ORDER.REQ</code></td><td>Backlog incidents, capacity warnings</td></tr>
+            <tr><td>MQ depth</td><td>Metric: <code>ibm.mq.queue.depth</code> · dims <code>queue = ORDER.REQ</code>, <code>queue_manager = QM1</code></td><td>Backlog incidents — requires MQ sidecar exporting (see gotchas)</td></tr>
+            <tr><td>RabbitMQ depth</td><td>Metric: <code>rabbitmq.message.current</code> · dim <code>state = ready</code> · <code>rabbitmq.queue.name = demo.orders</code></td><td>Queue must exist — run <code>load-rabbit-traffic.sh</code></td></tr>
+            <tr><td>Kafka</td><td>Search <code>kafka.broker</code>, <code>kafka.consumer</code>, <code>kafka.topic</code> (kafkametrics names)</td><td>After <code>load-kafka-traffic.sh</code>; scrape every 30s</td></tr>
             <tr><td>MQ APM — producer</td><td>Service <code>order-producer</code> · span <code>mq.put.order</code></td><td>Confirm upstream still publishing</td></tr>
             <tr><td>MQ APM — consumer</td><td>Service <code>order-consumer</code> · span <code>mq.get.order</code></td><td>Confirm downstream consuming; absence = app issue</td></tr>
             <tr><td>Trace by business ID</td><td>APM Traces · tag <code>correlation.id</code> or search correlation header value</td><td>“Order X failed” — find exact path</td></tr>
-            <tr><td>Kafka</td><td>Search metrics containing <code>kafka</code> (broker / consumer group series from kafkametrics)</td><td>Lag, broker health, replay storms</td></tr>
-            <tr><td>RabbitMQ</td><td>Search metrics containing <code>rabbitmq</code></td><td>Queue growth, node down, rate anomalies</td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section id="platform-uis">
+        <h2>Platform admin UIs</h2>
+        <p class="muted">Local consoles to verify queues and prove metrics match Splunk during the demo. All URLs assume the stack is running on your laptop.</p>
+
+        <table class="info-table">
+          <thead>
+            <tr><th>Platform</th><th>UI / access</th><th>Login</th><th>What to show</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="platform-badge platform-badge--mq">IBM MQ</span> QM1</td>
+              <td><a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a></td>
+              <td><code>admin</code> / <code>passw0rd</code></td>
+              <td>Queue <code>ORDER.REQ</code> depth · channels <code>DEV.APP.SVRCONN</code>, <code>MQOTEL.SVRCONN</code> · compare to <code>ibm.mq.queue.depth</code> in Splunk</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--rmq">RabbitMQ</span></td>
+              <td><a href="http://localhost:15672">http://localhost:15672</a></td>
+              <td><code>demo</code> / <code>passw0rd</code></td>
+              <td>Queues tab → <code>demo.orders</code> (after <code>load-rabbit-traffic.sh</code>) · Ready messages vs <code>rabbitmq.message.current</code> in Splunk</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--kafka">Kafka</span></td>
+              <td>No web UI in this lab — CLI only</td>
+              <td>—</td>
+              <td><code>docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list</code> · topic <code>demo.orders</code> after traffic script</td>
+            </tr>
+            <tr>
+              <td>Demo guide</td>
+              <td><a href="http://localhost:8092">http://localhost:8092</a></td>
+              <td>—</td>
+              <td>Presenter script (this site served locally from Compose)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — side-by-side with Splunk</p>
+          <ol class="show-steps">
+            <li><strong>MQ:</strong> Open Web Console → Queues → <code>ORDER.REQ</code> current depth. Splunk: <code>ibm.mq.queue.depth</code> with <code>queue=ORDER.REQ</code>.</li>
+            <li><strong>RabbitMQ:</strong> Management UI → Queues → <code>demo.orders</code>. Run <code>bash scripts/load-rabbit-traffic.sh 10</code> first. Splunk: <code>rabbitmq.message.current</code>, <code>state=ready</code>.</li>
+            <li><strong>Kafka:</strong> Terminal topic list + Splunk metrics starting with <code>kafka.broker</code> or <code>kafka.topic</code>.</li>
+          </ol>
+        </div>
+
+        <h3>IBM MQ Web Console tips</h3>
+        <ul>
+          <li>Queue manager name: <strong>QM1</strong></li>
+          <li>Client port (apps): <code>localhost:1414</code></li>
+          <li>If the console shows a certificate warning, accept for local dev or use HTTP on 9443 as configured in the dev image</li>
+        </ul>
+
+        <h3>RabbitMQ management API (collector uses this)</h3>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-rabbit-api">Copy</button></div>
+          <pre><code id="cmd-rabbit-api">curl -sf -u demo:passw0rd http://localhost:15672/api/overview | head
+curl -sf -u demo:passw0rd http://localhost:15672/api/queues</code></pre>
+        </div>
       </section>
 
       <section id="splunk-token">

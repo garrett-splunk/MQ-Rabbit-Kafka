@@ -8,6 +8,18 @@ MQ_USER="${MQ_USER:-app}"
 MQ_PASSWORD="${MQ_PASSWORD:-passw0rd}"
 OTLP_ENDPOINT="${OTLP_ENDPOINT:-http://otel-collector:4318}"
 SCRAPE_INTERVAL_SECONDS="${SCRAPE_INTERVAL_SECONDS:-15}"
+COLLECTOR_HEALTH_URL="${COLLECTOR_HEALTH_URL:-http://otel-collector:13133/}"
+
+echo "Waiting for OTel Collector at ${COLLECTOR_HEALTH_URL}..."
+deadline=$(( $(date +%s) + 120 ))
+until curl -sf "${COLLECTOR_HEALTH_URL}" >/dev/null 2>&1; do
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "ERROR: OTel Collector not ready after 120s — start otel-collector first."
+    exit 1
+  fi
+  sleep 3
+done
+echo "OTel Collector is ready."
 
 CONFIG=/tmp/config.yml
 sed \
