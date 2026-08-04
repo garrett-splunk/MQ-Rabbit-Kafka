@@ -186,31 +186,111 @@
           </thead>
           <tbody>
             <tr>
-              <td><strong>Splunk OTel Collector agent</strong></td>
+              <td><strong><a href="#otelbin-pieces-splunk-agent">Splunk OTel Collector agent</a></strong></td>
               <td>Trimmed <code>agent_config.yaml</code> pattern: OTLP ingest, host metrics, <code>signalfx</code> + <code>otlp_http</code> exporters</td>
               <td><a href="https://github.com/signalfx/splunk-otel-collector/blob/main/cmd/otelcol/config/collector/agent_config.yaml" target="_blank" rel="noopener">splunk-otel-collector agent_config.yaml</a></td>
               <td><a class="otelbin-link" data-otelbin-link="splunk-agent-baseline" href="https://www.otelbin.io/?#config=**H_Splunk_Distribution_of_the_OpenTelemetry_Collector_%E2%80%94_agent_baseline_*Ctrimmed*D*N*H_Full_reference%3A_https%3A%2F%2Fgithub.com%2Fsignalfx%2Fsplunk-otel-collector%2Fblob%2Fmain%2Fcmd%2Fotelcol%2Fconfig%2Fcollector%2Fagent*_config.yaml*N*H_Visualize_on_OTelBin%3A_see_demo-site_*Hotelbin-examples*N*Nextensions%3A*N__health*_check%3A*N____endpoint%3A_0.0.0.0%3A13133*N*Nreceivers%3A*N__otlp%3A*N____protocols%3A*N______grpc%3A*N________endpoint%3A_0.0.0.0%3A4317*N______http%3A*N________endpoint%3A_0.0.0.0%3A4318*N__host*_metrics%3A*N____collection*_interval%3A_10s*N____scrapers%3A*N______cpu%3A*N______memory%3A*N______disk%3A*N______network%3A*N*Nprocessors%3A*N__batch%3A*N__memory*_limiter%3A*N____check*_interval%3A_2s*N____limit*_mib%3A_512*N__resource*_detection%3A*N____detectors%3A_%5Bsystem%5D*N____override%3A_true*N*Nexporters%3A*N__otlp*_http%3A*N____traces*_endpoint%3A_*S%7BSPLUNK*_INGEST*_URL%7D%2Fv2%2Ftrace%2Fotlp*N____headers%3A*N______X-SF-Token%3A_*S%7BSPLUNK*_ACCESS*_TOKEN%7D*N__signalfx%3A*N____access*_token%3A_*S%7BSPLUNK*_ACCESS*_TOKEN%7D*N____api*_url%3A_*S%7BSPLUNK*_API*_URL%7D*N____ingest*_url%3A_*S%7BSPLUNK*_INGEST*_URL%7D*N____sync*_host*_metadata%3A_true*N*Nservice%3A*N__extensions%3A_%5Bhealth*_check%5D*N__pipelines%3A*N____traces%3A*N______receivers%3A_%5Botlp%5D*N______processors%3A_%5Bmemory*_limiter%2C_batch%2C_resource*_detection%5D*N______exporters%3A_%5Botlp*_http%5D*N____metrics%3A*N______receivers%3A_%5Bhost*_metrics%2C_otlp%5D*N______processors%3A_%5Bmemory*_limiter%2C_batch%2C_resource*_detection%5D*N______exporters%3A_%5Bsignalfx%5D*N%7E" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
             </tr>
             <tr>
-              <td><span class="platform-badge platform-badge--rmq">RabbitMQ</span> receiver</td>
+              <td><span class="platform-badge platform-badge--rmq">RabbitMQ</span> <a href="#otelbin-pieces-rabbitmq">receiver</a></td>
               <td>Management API scrape → <code>rabbitmq.message.current</code> and related metrics → Splunk</td>
               <td><a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/rabbitmq-receiver" target="_blank" rel="noopener">Splunk rabbitmq receiver</a></td>
               <td><a class="otelbin-link" data-otelbin-link="rabbitmq-receiver" href="https://www.otelbin.io/?#config=**H_RabbitMQ_receiver_%E2%86%92_Splunk_Observability_Cloud*N*H_Docs%3A_https%3A%2F%2Fhelp.splunk.com%2Fen%2Fsplunk-observability-cloud%2Fmanage-data%2Fsplunk-distribution-of-the-opentelemetry-collector%2Fget-started-with-the-splunk-distribution-of-the-opentelemetry-collector%2Fcollector-components%2Freceivers%2Frabbitmq-receiver*N*Nextensions%3A*N__health*_check%3A*N____endpoint%3A_0.0.0.0%3A13133*N*Nreceivers%3A*N__rabbitmq%3A*N____endpoint%3A_http%3A%2F%2Flocalhost%3A15672*N____username%3A_demo*N____password%3A_*S%7Benv%3ARABBITMQ*_PASSWORD%7D*N____collection*_interval%3A_15s*N*Nprocessors%3A*N__batch%3A*N__memory*_limiter%3A*N____check*_interval%3A_2s*N____limit*_mib%3A_256*N__resource%2Fadd*_environment%3A*N____attributes%3A*N______-_key%3A_deployment.environment.name*N________value%3A_messaging-demo-lab*N________action%3A_upsert*N*Nexporters%3A*N__signalfx%3A*N____access*_token%3A_*S%7BSPLUNK*_ACCESS*_TOKEN%7D*N____realm%3A_*S%7BSPLUNK*_REALM%7D*N____ingest*_url%3A_*S%7BSPLUNK*_INGEST*_URL%7D*N____api*_url%3A_*S%7BSPLUNK*_API*_URL%7D*N*Nservice%3A*N__extensions%3A_%5Bhealth*_check%5D*N__pipelines%3A*N____metrics%3A*N______receivers%3A_%5Brabbitmq%5D*N______processors%3A_%5Bmemory*_limiter%2C_resource%2Fadd*_environment%2C_batch%5D*N______exporters%3A_%5Bsignalfx%5D*N%7E" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
             </tr>
             <tr>
-              <td><span class="platform-badge platform-badge--kafka">Kafka</span> metrics receiver</td>
+              <td><span class="platform-badge platform-badge--kafka">Kafka</span> <a href="#otelbin-pieces-kafka">metrics receiver</a></td>
               <td>Broker, topic, and consumer group scrapers → <code>kafka.broker.*</code> / <code>kafka.consumer.*</code></td>
               <td><a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/kafka-metrics-receiver" target="_blank" rel="noopener">Splunk kafkametrics receiver</a></td>
               <td><a class="otelbin-link" data-otelbin-link="kafka-metrics-receiver" href="https://www.otelbin.io/?#config=**H_Kafka_metrics_receiver_%E2%86%92_Splunk_Observability_Cloud*N*H_Docs%3A_https%3A%2F%2Fhelp.splunk.com%2Fen%2Fsplunk-observability-cloud%2Fmanage-data%2Fsplunk-distribution-of-the-opentelemetry-collector%2Fget-started-with-the-splunk-distribution-of-the-opentelemetry-collector%2Fcollector-components%2Freceivers%2Fkafka-metrics-receiver*N*Nextensions%3A*N__health*_check%3A*N____endpoint%3A_0.0.0.0%3A13133*N*Nreceivers%3A*N__kafkametrics%3A*N____brokers%3A*N______-_localhost%3A9092*N____protocol*_version%3A_3.6.0*N____scrapers%3A*N______-_brokers*N______-_topics*N______-_consumers*N____collection*_interval%3A_30s*N*Nprocessors%3A*N__batch%3A*N__memory*_limiter%3A*N____check*_interval%3A_2s*N____limit*_mib%3A_256*N__resource%2Fadd*_environment%3A*N____attributes%3A*N______-_key%3A_deployment.environment.name*N________value%3A_messaging-demo-lab*N________action%3A_upsert*N*Nexporters%3A*N__signalfx%3A*N____access*_token%3A_*S%7BSPLUNK*_ACCESS*_TOKEN%7D*N____realm%3A_*S%7BSPLUNK*_REALM%7D*N____ingest*_url%3A_*S%7BSPLUNK*_INGEST*_URL%7D*N____api*_url%3A_*S%7BSPLUNK*_API*_URL%7D*N*Nservice%3A*N__extensions%3A_%5Bhealth*_check%5D*N__pipelines%3A*N____metrics%3A*N______receivers%3A_%5Bkafkametrics%5D*N______processors%3A_%5Bmemory*_limiter%2C_resource%2Fadd*_environment%2C_batch%5D*N______exporters%3A_%5Bsignalfx%5D*N%7E" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
             </tr>
             <tr>
-              <td><span class="platform-badge platform-badge--mq">IBM MQ</span> OTLP sidecar</td>
+              <td><span class="platform-badge platform-badge--mq">IBM MQ</span> <a href="#otelbin-pieces-ibm-mq">OTLP sidecar</a></td>
               <td>Java Contrib <code>ibm-mq-metrics</code> → OTLP → collector → <code>ibm.mq.queue.depth</code> in Splunk</td>
               <td><a href="https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/ibm-mq-metrics" target="_blank" rel="noopener">OpenTelemetry Java Contrib ibm-mq-metrics</a></td>
               <td><a class="otelbin-link" data-otelbin-link="ibm-mq-otlp-sidecar" href="https://www.otelbin.io/?#config=**H_IBM_MQ_metrics_via_OpenTelemetry_Java_Contrib_sidecar_%E2%86%92_OTLP_%E2%86%92_Splunk*N*H_Sidecar%3A_https%3A%2F%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-java-contrib%2Ftree%2Fmain%2Fibm-mq-metrics*N*H_Exports_ibm.mq.queue.depth_and_related_metrics%3B_collector_receives_OTLP_and_forwards_to_Splunk.*N*Nextensions%3A*N__health*_check%3A*N____endpoint%3A_0.0.0.0%3A13133*N*Nreceivers%3A*N__otlp%3A*N____protocols%3A*N______grpc%3A*N________endpoint%3A_0.0.0.0%3A4317*N______http%3A*N________endpoint%3A_0.0.0.0%3A4318*N*Nprocessors%3A*N__batch%3A*N__memory*_limiter%3A*N____check*_interval%3A_2s*N____limit*_mib%3A_256*N__resource%2Fadd*_environment%3A*N____attributes%3A*N______-_key%3A_deployment.environment.name*N________value%3A_messaging-demo-lab*N________action%3A_upsert*N______-_key%3A_queue*_manager*N________value%3A_QM1*N________action%3A_upsert*N*Nexporters%3A*N__signalfx%3A*N____access*_token%3A_*S%7BSPLUNK*_ACCESS*_TOKEN%7D*N____realm%3A_*S%7BSPLUNK*_REALM%7D*N____ingest*_url%3A_*S%7BSPLUNK*_INGEST*_URL%7D*N____api*_url%3A_*S%7BSPLUNK*_API*_URL%7D*N__otlphttp%2Ftraces%3A*N____traces*_endpoint%3A_*S%7BSPLUNK*_INGEST*_URL%7D%2Fv2%2Ftrace%2Fotlp*N____headers%3A*N______X-SF-Token%3A_*S%7BSPLUNK*_ACCESS*_TOKEN%7D*N*Nservice%3A*N__extensions%3A_%5Bhealth*_check%5D*N__pipelines%3A*N____metrics%3A*N______receivers%3A_%5Botlp%5D*N______processors%3A_%5Bmemory*_limiter%2C_resource%2Fadd*_environment%2C_batch%5D*N______exporters%3A_%5Bsignalfx%5D*N____traces%3A*N______receivers%3A_%5Botlp%5D*N______processors%3A_%5Bmemory*_limiter%2C_resource%2Fadd*_environment%2C_batch%5D*N______exporters%3A_%5Botlphttp%2Ftraces%5D*N%7E" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
             </tr>
           </tbody>
         </table>
+
+        <h3>Required pieces per integration</h3>
+        <p class="muted">When you open an example in OTelBin, highlight only the blocks that apply to that platform. Green = always required; optional pieces are called out separately.</p>
+
+        <div class="otelbin-pieces">
+          <article class="otelbin-piece callout callout--info" id="otelbin-pieces-splunk-agent">
+            <p class="callout__title">Splunk OTel Collector agent — what you need</p>
+            <table class="info-table info-table--compact">
+              <tbody>
+                <tr><th scope="row">Distribution</th><td><strong>Splunk Distribution of the OpenTelemetry Collector</strong> (not vanilla contrib for production Splunk O11y)</td></tr>
+                <tr><th scope="row">Extension</th><td><code>health_check</code> on <code>:13133</code></td></tr>
+                <tr><th scope="row">Receivers</th><td><code>otlp</code> (gRPC <code>:4317</code> + HTTP <code>:4318</code>) for app/sidecar telemetry · <code>host_metrics</code> for node CPU/memory/disk/network</td></tr>
+                <tr><th scope="row">Processors</th><td><code>memory_limiter</code> → <code>batch</code> → <code>resource_detection</code> (system detector)</td></tr>
+                <tr><th scope="row">Exporters</th><td><strong>Traces:</strong> <code>otlp_http</code> → <code>${SPLUNK_INGEST_URL}/v2/trace/otlp</code> with <code>X-SF-Token</code> · <strong>Metrics:</strong> <code>signalfx</code> (access token + ingest/api URLs)</td></tr>
+                <tr><th scope="row">Pipelines</th><td><code>traces</code>: <code>otlp</code> → processors → <code>otlp_http</code> · <code>metrics</code>: <code>host_metrics</code> + <code>otlp</code> → processors → <code>signalfx</code></td></tr>
+                <tr><th scope="row">Secrets / env</th><td><code>SPLUNK_ACCESS_TOKEN</code>, <code>SPLUNK_INGEST_URL</code>, <code>SPLUNK_API_URL</code></td></tr>
+                <tr><th scope="row">Not in this example</th><td>Messaging receivers (<code>rabbitmq</code>, <code>kafkametrics</code>) — add those in the platform-specific OTelBin configs below</td></tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article class="otelbin-piece callout callout--info" id="otelbin-pieces-rabbitmq">
+            <p class="callout__title"><span class="platform-badge platform-badge--rmq">RabbitMQ</span> receiver — what you need</p>
+            <table class="info-table info-table--compact">
+              <tbody>
+                <tr><th scope="row">Outside collector</th><td>RabbitMQ with <strong>management plugin</strong> enabled (HTTP API, default <code>:15672</code>) · user with at least <strong>monitoring</strong> tag · queues must exist before queue-level metrics appear</td></tr>
+                <tr><th scope="row">Receiver</th><td><code>rabbitmq</code> — set <code>endpoint</code>, <code>username</code>, <code>password</code>, <code>collection_interval</code></td></tr>
+                <tr><th scope="row">Processors</th><td><code>memory_limiter</code> → <code>resource/add_environment</code> (<code>deployment.environment.name</code>) → <code>batch</code></td></tr>
+                <tr><th scope="row">Exporter</th><td><code>signalfx</code> only — metrics do <strong>not</strong> use <code>otlp_http</code> in the standard Splunk agent pattern</td></tr>
+                <tr><th scope="row">Pipeline</th><td><code>metrics</code> only: <code>rabbitmq</code> → processors → <code>signalfx</code></td></tr>
+                <tr><th scope="row">Secrets / env</th><td><code>SPLUNK_ACCESS_TOKEN</code>, <code>SPLUNK_REALM</code>, <code>SPLUNK_INGEST_URL</code>, <code>SPLUNK_API_URL</code>, <code>RABBITMQ_PASSWORD</code></td></tr>
+                <tr><th scope="row">Splunk metrics</th><td><code>rabbitmq.message.current</code> (dim <code>message.state=ready</code>), <code>rabbitmq.consumer.count</code>, node metrics if enabled</td></tr>
+                <tr><th scope="row">This demo</th><td>Management UI <a href="http://localhost:15672">localhost:15672</a> · queue <code>demo.orders</code> · run <code>load-rabbit-traffic.sh</code></td></tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article class="otelbin-piece callout callout--info" id="otelbin-pieces-kafka">
+            <p class="callout__title"><span class="platform-badge platform-badge--kafka">Kafka</span> metrics receiver — what you need</p>
+            <table class="info-table info-table--compact">
+              <tbody>
+                <tr><th scope="row">Outside collector</th><td>Kafka broker reachable on bootstrap address (e.g. <code>host:9092</code>) · <code>protocol_version</code> must match the cluster · for MSK/Confluent add <code>auth</code> (TLS / SASL) in production</td></tr>
+                <tr><th scope="row">Receiver</th><td><code>kafkametrics</code> — <code>brokers</code>, <code>protocol_version</code>, <code>scrapers</code> (<code>brokers</code>, <code>topics</code>, <code>consumers</code>), <code>collection_interval</code></td></tr>
+                <tr><th scope="row">Processors</th><td><code>memory_limiter</code> → <code>resource/add_environment</code> → <code>batch</code></td></tr>
+                <tr><th scope="row">Exporter</th><td><code>signalfx</code></td></tr>
+                <tr><th scope="row">Pipeline</th><td><code>metrics</code> only: <code>kafkametrics</code> → processors → <code>signalfx</code></td></tr>
+                <tr><th scope="row">Secrets / env</th><td>Same Splunk token/URL vars as RabbitMQ example</td></tr>
+                <tr><th scope="row">Splunk metrics</th><td><code>kafka.broker.*</code>, <code>kafka.topic.*</code>, <code>kafka.consumer.*</code> (consumer lag from <code>consumers</code> scraper)</td></tr>
+                <tr><th scope="row">This demo</th><td>Broker <code>localhost:9092</code> (internal <code>kafka:19092</code> in Compose) · topic <code>demo.orders</code> after <code>load-kafka-traffic.sh</code></td></tr>
+              </tbody>
+            </table>
+          </article>
+
+          <article class="otelbin-piece callout callout--info" id="otelbin-pieces-ibm-mq">
+            <p class="callout__title"><span class="platform-badge platform-badge--mq">IBM MQ</span> — what you need (two components)</p>
+            <p class="muted">MQ is <strong>not</strong> a built-in collector receiver. You run the Java Contrib sidecar beside the queue manager; the collector only receives OTLP.</p>
+            <table class="info-table info-table--compact">
+              <tbody>
+                <tr><th scope="row">Outside collector (sidecar)</th><td><a href="https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/ibm-mq-metrics" target="_blank" rel="noopener">OpenTelemetry Java Contrib <code>ibm-mq-metrics</code></a> · MQ client connection: host, port, <code>SVRCONN</code> channel, user/password · sidecar <code>config.yml</code>: queue manager name, queue/channel filters, enabled metrics (e.g. <code>ibm.mq.queue.depth</code>)</td></tr>
+                <tr><th scope="row">Sidecar export</th><td>OTLP <strong>HTTP</strong> to collector — <code>OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318</code> (not gRPC <code>localhost:4317</code>)</td></tr>
+                <tr><th scope="row">Collector receiver</th><td><code>otlp</code> (gRPC + HTTP) — receives metrics <em>from the sidecar</em>, not from MQ directly</td></tr>
+                <tr><th scope="row">Processors</th><td><code>memory_limiter</code> → <code>resource/add_environment</code> (<code>deployment.environment.name</code>, optional <code>queue_manager</code>) → <code>batch</code></td></tr>
+                <tr><th scope="row">Exporters</th><td><strong>Metrics:</strong> <code>signalfx</code> · <strong>Traces (optional):</strong> <code>otlphttp/traces</code> if instrumented MQ apps also send spans to the same collector</td></tr>
+                <tr><th scope="row">Pipelines</th><td><code>metrics</code>: <code>otlp</code> → processors → <code>signalfx</code> · <code>traces</code>: <code>otlp</code> → processors → <code>otlphttp/traces</code> (when APM apps present)</td></tr>
+                <tr><th scope="row">Splunk metrics</th><td><code>ibm.mq.queue.depth</code>, <code>ibm.mq.manager.status</code>, enqueue/dequeue counts — filter by <code>queue</code>, <code>queue_manager</code></td></tr>
+                <tr><th scope="row">This demo</th><td>Sidecar service <code>ibm-mq-java-metrics</code> · QM1 · channel <code>MQOTEL.SVRCONN</code> · queue <code>ORDER.REQ</code> · console <a href="http://localhost:9443/ibmmq/console">localhost:9443</a></td></tr>
+              </tbody>
+            </table>
+          </article>
+        </div>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — how the four OTelBin examples fit together</p>
+          <ol class="show-steps">
+            <li><strong>Start with Splunk agent baseline</strong> — establishes <code>signalfx</code> + <code>otlp_http</code> export pattern every customer already uses for host/APM.</li>
+            <li><strong>Add Rabbit or Kafka receiver</strong> — one new block under <code>receivers:</code>, wire into existing <code>metrics</code> pipeline, same <code>signalfx</code> exporter.</li>
+            <li><strong>MQ is different</strong> — deploy sidecar + collector <code>otlp</code> receiver; in OTelBin you will see metrics enter via OTLP, not an <code>ibm.mq</code> receiver block.</li>
+            <li><strong>Unified lab</strong> — <code>collector/otelcol-config.yaml</code> merges all three: <code>otlp</code> + <code>kafkametrics</code> + <code>rabbitmq</code> on one metrics pipeline.</li>
+          </ol>
+        </div>
 
         <p class="muted">This lab’s live Compose config merges all three messaging paths: <code>collector/otelcol-config.yaml</code>.</p>
       </section>
