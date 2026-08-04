@@ -129,6 +129,8 @@ details.facilitator .facilitator__body { padding: 0 1rem 1rem; font-size: 0.875r
 .info-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin: 1rem 0; }
 .info-table th, .info-table td { text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--color-border); }
 .info-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-ink-muted); }
+.otelbin-link { font-weight: 600; white-space: nowrap; }
+.otelbin-table td:last-child { width: 9rem; }
 
 .checklist { list-style: none; padding: 0; }
 .checklist li { position: relative; padding-left: 1.5rem; margin-bottom: 0.5rem; }

@@ -46,6 +46,19 @@ After editing, restart the collector: `docker compose up -d otel-collector`
 
 > **Gotcha:** Use `deployment.environment.name`, not `deployment.environment` — the UI often only matches on `.name`.
 
+### Platform admin UIs (local stack)
+
+| Platform | URL | Login | What to verify |
+|----------|-----|-------|----------------|
+| **IBM MQ Web Console** (QM1) | http://localhost:9443/ibmmq/console | `admin` / `passw0rd` | Queue `ORDER.REQ` depth vs `ibm.mq.queue.depth` in Splunk |
+| **RabbitMQ Management** | http://localhost:15672 | `demo` / `passw0rd` | Queue `demo.orders` ready count vs `rabbitmq.message.current` |
+| **Kafka** | CLI only | — | `docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list` |
+| **Demo guide** | http://localhost:8092 | — | Presenter script |
+
+See [demo guide — Platform UIs](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#platform-uis) for side-by-side Splunk steps.
+
+See [demo guide — OTelBin configs](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#otelbin-examples) for interactive collector YAML (Splunk agent, RabbitMQ, Kafka, IBM MQ).
+
 See [demo guide — Splunk token](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#splunk-token) for full steps.
 
 Or step by step:
@@ -74,6 +87,21 @@ bash scripts/demo-incident-mq-backlog.sh         # stop consumer → depth alert
 bash scripts/load-kafka-traffic.sh demo.orders 15
 bash scripts/load-rabbit-traffic.sh 10           # uses curl + management API (no pika)
 ```
+
+## Collector examples (OTelBin)
+
+Interactive pipeline visualizations on [OTelBin](https://www.otelbin.io/) — regenerate after editing YAML:
+
+```bash
+bash scripts/generate-otelbin-links.sh
+```
+
+| Example | Source YAML |
+|---------|-------------|
+| [Splunk agent baseline](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#otelbin-examples) | `collector/otelbin-examples/splunk-agent-baseline.yaml` |
+| RabbitMQ receiver | `collector/otelbin-examples/rabbitmq-receiver.yaml` |
+| Kafka metrics receiver | `collector/otelbin-examples/kafka-metrics-receiver.yaml` |
+| IBM MQ OTLP sidecar | `collector/otelbin-examples/ibm-mq-otlp-sidecar.yaml` |
 
 ## GitHub Pages
 

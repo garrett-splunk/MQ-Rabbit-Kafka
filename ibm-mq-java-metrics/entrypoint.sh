@@ -33,6 +33,12 @@ sed \
   /opt/ibm-mq-metrics/config.lab.yml > "$CONFIG"
 
 echo "Starting OpenTelemetry Java Contrib ibm-mq-metrics (client mode) → ${OTLP_ENDPOINT}"
+export OTEL_EXPORTER_OTLP_ENDPOINT="${OTLP_ENDPOINT}"
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="${OTLP_ENDPOINT}/v1/metrics"
+export OTEL_EXPORTER_OTLP_METRICS_PROTOCOL=http/protobuf
+export OTEL_LOGS_EXPORTER=none
+export OTEL_TRACES_EXPORTER=none
 exec java \
   -cp "/opt/ibm-mq-metrics/ibm-mq-metrics.jar:/opt/ibm-mq-metrics/com.ibm.mq.allclient.jar" \
   io.opentelemetry.ibm.mq.opentelemetry.Main \

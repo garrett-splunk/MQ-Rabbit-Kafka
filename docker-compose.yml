@@ -120,6 +120,9 @@ services:
       MQ_USER: ${MQ_USER:-app}
       MQ_PASSWORD: ${MQ_APP_PASSWORD:-passw0rd}
       OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics
       SCRAPE_INTERVAL_SECONDS: "15"
     restart: unless-stopped
 

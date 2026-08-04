@@ -1,0 +1,52 @@
+# IBM MQ metrics via OpenTelemetry Java Contrib sidecar → OTLP → Splunk
+# Sidecar: https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/ibm-mq-metrics
+# Exports ibm.mq.queue.depth and related metrics; collector receives OTLP and forwards to Splunk.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: 256
+  resource/add_environment:
+    attributes:
+      - key: deployment.environment.name
+        value: messaging-demo-lab
+        action: upsert
+      - key: queue_manager
+        value: QM1
+        action: upsert
+
+exporters:
+  signalfx:
+    access_token: ${SPLUNK_ACCESS_TOKEN}
+    realm: ${SPLUNK_REALM}
+    ingest_url: ${SPLUNK_INGEST_URL}
+    api_url: ${SPLUNK_API_URL}
+  otlphttp/traces:
+    traces_endpoint: ${SPLUNK_INGEST_URL}/v2/trace/otlp
+    headers:
+      X-SF-Token: ${SPLUNK_ACCESS_TOKEN}
+
+service:
+  extensions: [health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/add_environment, batch]
+      exporters: [signalfx]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/add_environment, batch]
+      exporters: [otlphttp/traces]

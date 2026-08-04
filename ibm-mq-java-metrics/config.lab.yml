@@ -21,7 +21,7 @@ queueManagers:
           values: ["SYSTEM", "AMQ"]
 
     channelFilters:
-      include: ["DEV.*", "MQOTEL.*"]
+      include: ["MQOTEL.*"]
       exclude:
         - type: "STARTSWITH"
           values: ["SYSTEM"]
@@ -61,6 +61,11 @@ metrics:
 otlpExporter:
   otel.exporter.otlp.endpoint: __OTLP_ENDPOINT__
   otel.exporter.otlp.protocol: http/protobuf
+  otel.exporter.otlp.metrics.endpoint: __OTLP_ENDPOINT__/v1/metrics
+  otel.exporter.otlp.metrics.protocol: http/protobuf
+  otel.metric.export.interval: __SCRAPE_INTERVAL_SECONDS__s
+  otel.logs.exporter: none
+  otel.traces.exporter: none
 
 sslConnection:
   trustStorePath: ""
