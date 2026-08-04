@@ -1,0 +1,21 @@
+{
+  "name": "@mq-lab/order-consumer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node -r @mq-lab/shared/instrumentation dist/index.js",
+    "dev": "tsx -r @mq-lab/shared/instrumentation src/index.ts"
+  },
+  "dependencies": {
+    "@mq-lab/shared": "1.0.0",
+    "express": "^4.21.2",
+    "ibmmq": "^2.1.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

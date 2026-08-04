@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.splunk
+.env.*.local
+*.secrets
+secrets/mqAppPassword.txt
+secrets/mqAdminPassword.txt
+.DS_Store
+/order-producer/
+/order-consumer/
+/shared/

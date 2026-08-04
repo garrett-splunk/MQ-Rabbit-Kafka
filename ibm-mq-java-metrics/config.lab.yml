@@ -1,0 +1,69 @@
+taskSchedule:
+  numberOfThreads: 10
+  initialDelaySeconds: 30
+  taskDelaySeconds: __SCRAPE_INTERVAL_SECONDS__
+
+queueManagers:
+  - name: "QM1"
+    host: "__MQ_HOST__"
+    port: __MQ_PORT__
+    maxActiveChannels: 4200
+    transportType: "Client"
+    channelName: "__MQ_CHANNEL__"
+    username: "__MQ_USER__"
+    password: "__MQ_PASSWORD__"
+    replyQueuePrefix: "MQJAVA."
+
+    queueFilters:
+      include: ["ORDER.*", "DEV.QUEUE.*"]
+      exclude:
+        - type: "STARTSWITH"
+          values: ["SYSTEM", "AMQ"]
+
+    channelFilters:
+      include: ["DEV.*", "MQOTEL.*"]
+      exclude:
+        - type: "STARTSWITH"
+          values: ["SYSTEM"]
+
+    listenerFilters:
+      include: ["*"]
+      exclude:
+        - type: "STARTSWITH"
+          values: ["SYSTEM"]
+
+    topicFilters:
+      include: ["#"]
+      exclude:
+        - type: "STARTSWITH"
+          values: ["SYSTEM", "$SYS"]
+
+metrics:
+  "ibm.mq.queue.depth":
+    enabled: true
+  "ibm.mq.manager.status":
+    enabled: true
+  "ibm.mq.status":
+    enabled: true
+  "ibm.mq.message.enq.count":
+    enabled: true
+  "ibm.mq.message.deq.count":
+    enabled: true
+  "ibm.mq.open.input.count":
+    enabled: true
+  "ibm.mq.open.output.count":
+    enabled: true
+  "ibm.mq.connection.count":
+    enabled: true
+  "ibm.mq.heartbeat":
+    enabled: true
+
+otlpExporter:
+  otel.exporter.otlp.endpoint: __OTLP_ENDPOINT__
+  otel.exporter.otlp.protocol: http/protobuf
+
+sslConnection:
+  trustStorePath: ""
+  trustStorePassword: ""
+  keyStorePath: ""
+  keyStorePassword: ""

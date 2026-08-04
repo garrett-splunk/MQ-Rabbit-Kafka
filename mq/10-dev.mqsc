@@ -1,0 +1,5 @@
+* Order flow queues (in addition to MQ developer defaults when MQ_DEV=true)
+DEFINE QLOCAL(ORDER.REQ) REPLACE MAXDEPTH(5000)
+DEFINE QLOCAL(ORDER.RESP) REPLACE MAXDEPTH(5000)
+ALTER QLOCAL(ORDER.REQ) DESCR('Order request queue for Splunk O11y lab')
+ALTER QLOCAL(ORDER.RESP) DESCR('Order response queue for Splunk O11y lab')

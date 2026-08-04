@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto" data-theme-mode="auto">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unified Messaging Observability — IBM MQ · Kafka · RabbitMQ · Splunk</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="#overview">
+        <span class="brand__mark">splunk&gt;</span>
+        <span class="brand__tag">messaging demo · mq · kafka · rabbitmq</span>
+      </a>
+      <div class="header-actions">
+        <a class="header-doc-link" href="https://github.com/garrett-splunk/MQ-Rabbit-Kafka" target="_blank" rel="noopener">GitHub</a>
+        <a class="header-doc-link" href="https://garrett-splunk.github.io/MQ-Java-Otel-Workshop/" target="_blank" rel="noopener">MQ-only lab</a>
+        <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+          <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="4"/></svg>
+          <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="progress" aria-hidden="true"><div class="progress__bar" id="progressBar"></div></div>
+
+  <div class="page">
+    <aside class="sidebar" aria-label="Demo guide">
+      <p class="sidebar__sub">Customer demo</p>
+      <p class="sidebar__hint">Presenter guide · ~45–60 min</p>
+      <ul class="sidebar-tree">
+        <li><a href="#overview" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Overview</a></li>
+        <li><a href="#requirements" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Requirements map</a></li>
+        <li><a href="#value" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">★</span> Splunk value adds</a></li>
+        <li><a href="#architecture" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Architecture</a></li>
+        <li><a href="#demo-script" class="sidebar-tree__link" data-step="1"><span class="sidebar-tree__num">1</span> Demo script</a></li>
+        <li><a href="#platform-mq" class="sidebar-tree__link" data-step="2"><span class="sidebar-tree__num">2</span> IBM MQ</a></li>
+        <li><a href="#platform-kafka" class="sidebar-tree__link" data-step="3"><span class="sidebar-tree__num">3</span> Kafka</a></li>
+        <li><a href="#platform-rabbit" class="sidebar-tree__link" data-step="4"><span class="sidebar-tree__num">4</span> RabbitMQ</a></li>
+        <li><a href="#dynatrace-map" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Dynatrace mapping</a></li>
+        <li><a href="#splunk-views" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Splunk cheat sheet</a></li>
+        <li><a href="#facilitator-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⚙</span> Facilitator setup</a></li>
+      </ul>
+      <div class="sidebar-footer">
+        <a href="https://github.com/garrett-splunk/MQ-Rabbit-Kafka" target="_blank" rel="noopener">Clone repo</a>
+      </div>
+    </aside>
+
+    <main class="prose" id="content">
+      <header class="hero" id="overview">
+        <p class="eyebrow">Enterprise messaging · OpenTelemetry · Splunk Observability Cloud</p>
+        <h1>Unified messaging observability demo</h1>
+        <p class="lead">
+          One OpenTelemetry Collector ingests <strong>IBM MQ</strong>, <strong>Kafka</strong>, and <strong>RabbitMQ</strong> metrics into Splunk Observability Cloud — alongside APM traces from instrumented MQ sample apps. Built for customers who run multiple messaging platforms today (often with platform-specific extensions) and want a single observability backend.
+        </p>
+        <div class="callout callout--concept">
+          <p class="callout__title">How to use this site</p>
+          <p>This is a <strong>presenter demo guide</strong>, not a hands-on workshop. Your audience already knows setup; use <a href="#demo-script">Demo script</a> live and keep <a href="#facilitator-setup">Facilitator setup</a> for your prep. Pair with the customer’s Dynatrace MQ extension walkthrough (Thasthakir) using the <a href="#dynatrace-map">mapping table</a>.</p>
+        </div>
+      </header>
+
+      <section id="requirements">
+        <h2>Customer requirements map</h2>
+        <p class="muted">How this demo addresses the discovery questionnaire.</p>
+        <table class="info-table">
+          <thead><tr><th>Requirement</th><th>Customer context</th><th>This demo</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="platform-badge platform-badge--mq">IBM MQ</span> Primary</td>
+              <td>Thousands of queues/QMs; MQ extension + IR360; State Street managed</td>
+              <td><code>ibm.mq.*</code> metrics via Java Contrib sidecar; APM service map with PUT/GET spans; backlog incident drill</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--kafka">Kafka</span> Moderate</td>
+              <td>100+ instances; Dynatrace extension</td>
+              <td><a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/kafka-metrics-receiver" target="_blank" rel="noopener">kafkametrics</a> receiver — brokers, topics, consumer groups</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--rmq">RabbitMQ</span> Growing</td>
+              <td>100+ instances; AWS/Azure managed + colo; cloud-native + Dynatrace</td>
+              <td><a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/rabbitmq-receiver" target="_blank" rel="noopener">rabbitmq</a> receiver via management API; maps to Amazon MQ / self-hosted Rabbit</td>
+            </tr>
+            <tr>
+              <td>ActiveMQ</td>
+              <td>Moderate adoption</td>
+              <td>Out of scope for live demo — JMX/Prometheus path documented as follow-on</td>
+            </tr>
+            <tr>
+              <td>Metrics: broker, queue, producer/consumer, traces</td>
+              <td>All critical</td>
+              <td>MQ depth + APM spans; Kafka broker/consumer lag; RabbitMQ queue metrics</td>
+            </tr>
+            <tr>
+              <td>Diagnosis flow</td>
+              <td>Dynatrace MQ extension demo</td>
+              <td>Side-by-side mapping + MQ backlog scenario (<a href="#demo-script">Demo 2</a>)</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="value">
+        <h2>Splunk value adds</h2>
+        <p class="muted">Talking points when the customer compares Dynatrace extensions, AWS Distro OTel, and Grafana today.</p>
+
+        <div class="callout callout--value">
+          <p class="callout__title">Value add — One collector, one backend</p>
+          <p>Replace three extension patterns (MQ, Kafka, RabbitMQ) with <strong>one OTel Collector</strong> and <strong>one Splunk Observability Cloud tenant</strong>. Same deployment model they already use with <strong>AWS Distro of OpenTelemetry</strong> — add Splunk exporters alongside existing pipelines.</p>
+        </div>
+
+        <div class="callout callout--value">
+          <p class="callout__title">Value add — OpenTelemetry-native, vendor-neutral instrumentation</p>
+          <p>MQ metrics via <a href="https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/ibm-mq-metrics" target="_blank" rel="noopener">OpenTelemetry Java Contrib</a>; Kafka/Rabbit via standard collector receivers. No proprietary agent per platform — aligns with enterprise OTel strategy.</p>
+        </div>
+
+        <div class="callout callout--value">
+          <p class="callout__title">Value add — Metrics + APM correlation in one UI</p>
+          <p>When <code>ibm.mq.queue.depth</code> spikes, jump to APM traces for <code>order-producer</code> / <code>order-consumer</code> and see <code>mq.put.order</code> / <code>mq.get.order</code> spans — tie infrastructure signals to application behavior without switching tools.</p>
+        </div>
+
+        <div class="callout callout--value">
+          <p class="callout__title">Value add — Scale-ready metric model</p>
+          <p>Same dimensions they need at production scale: <code>queue</code>, <code>queue_manager</code>, <code>deployment.environment</code>. Detectors on sustained depth, scrape failures, and consumer lag apply across thousands of queues with grouping — not one-off dashboards per extension.</p>
+        </div>
+
+        <div class="callout callout--value">
+          <p class="callout__title">Value add — Complements IR360, does not replace it</p>
+          <p>IR360 remains the capacity/planning tool for MQ estate. Splunk O11y is the <strong>real-time operations</strong> layer: alerting, incident drill-down, and cross-platform correlation with Kafka/RabbitMQ on AWS/Azure.</p>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>Architecture</h2>
+        <div class="flow-diagram" role="img" aria-label="Unified messaging observability flow">
+          <div class="flow-node"><span class="platform-badge platform-badge--mq">MQ</span><div class="flow-title">IBM MQ + apps</div><div class="flow-sub">ibm.mq.* · APM traces</div></div>
+          <div class="flow-arrow"><span>→</span></div>
+          <div class="flow-node"><span class="platform-badge platform-badge--kafka">Kafka</span><div class="flow-title">Kafka broker</div><div class="flow-sub">kafkametrics</div></div>
+          <div class="flow-arrow"><span>→</span></div>
+          <div class="flow-node"><span class="platform-badge platform-badge--rmq">RMQ</span><div class="flow-title">RabbitMQ</div><div class="flow-sub">management API</div></div>
+          <div class="flow-arrow"><span>→</span></div>
+          <div class="flow-node flow-node-accent"><div class="flow-title">OTel Collector</div><div class="flow-sub">otlp · kafkametrics · rabbitmq</div></div>
+          <div class="flow-arrow"><span>→</span></div>
+          <div class="flow-node"><div class="flow-title">Splunk O11y</div><div class="flow-sub">Metrics · APM · detectors</div></div>
+        </div>
+        <p><strong>Splunk filter:</strong> <code>deployment.environment:messaging-demo-lab</code></p>
+        <table class="info-table">
+          <thead><tr><th>Signal</th><th>Source</th><th>Key metrics / views</th></tr></thead>
+          <tbody>
+            <tr><td>MQ infrastructure</td><td><code>ibm-mq-java-metrics</code> → OTLP</td><td><code>ibm.mq.queue.depth</code>, channel/queue manager series</td></tr>
+            <tr><td>MQ application</td><td>order-producer / consumer → OTLP traces</td><td>APM service map, <code>mq.put.order</code>, <code>mq.get.order</code></td></tr>
+            <tr><td>Kafka</td><td><code>kafkametrics</code> receiver</td><td>Broker, topic, partition, consumer group metrics</td></tr>
+            <tr><td>RabbitMQ</td><td><code>rabbitmq</code> receiver</td><td>Queue depth, publish/deliver rates, node health</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="demo-script">
+        <div class="step-meta"><span class="step-badge">Live demo</span><span class="step-time">~45 min</span></div>
+        <h2>Demo script</h2>
+
+        <h3>Demo 1 — Unified platform overview (10 min)</h3>
+        <ol class="checklist">
+          <li>Open <strong>Metric Explorer</strong> — show three metric families: <code>ibm.mq</code>, Kafka broker metrics, RabbitMQ metrics.</li>
+          <li>State the narrative: “Same collector pattern you use with ADOT — one export path to Splunk.”</li>
+          <li>Optional: run traffic generators before the meeting:</li>
+        </ol>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-traffic-all">Copy</button></div>
+          <pre><code id="cmd-traffic-all">bash scripts/load-traffic.sh 10 200          # MQ orders
+bash scripts/load-kafka-traffic.sh demo.orders 15
+bash scripts/load-rabbit-traffic.sh 10       # requires: pip install pika</code></pre>
+        </div>
+
+        <h3>Demo 2 — MQ backlog incident (15 min) ★ highlight</h3>
+        <p>Mirrors how ops teams use the Dynatrace MQ extension to diagnose queue buildup.</p>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-incident">Copy</button></div>
+          <pre><code id="cmd-incident">bash scripts/demo-incident-mq-backlog.sh
+# Splunk: ibm.mq.queue.depth rising on ORDER.REQ
+# APM: producer PUT spans only — no consumer GET
+# Restore: docker compose start order-consumer</code></pre>
+        </div>
+        <div class="callout callout--tip">
+          <p class="callout__title">Presenter note</p>
+          <p>After Thasthakir’s Dynatrace MQ extension demo, show the <strong>same symptom</strong> in Splunk using the mapping table below. Emphasize detector → trace drill-down as the Splunk differentiator.</p>
+        </div>
+
+        <h3>Demo 3 — MQ application trace correlation (15 min)</h3>
+        <ol class="checklist">
+          <li>Send order with correlation ID; show <code>order-producer</code> → <code>inventory-service</code> → MQ → <code>order-consumer</code> on the service map.</li>
+          <li>Explain async traces: two trees per order; link via <code>X-Correlation-Id</code> / span attributes.</li>
+        </ol>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-apm">Copy</button></div>
+          <pre><code id="cmd-apm">CORR_ID="demo-$(date +%s)"
+curl -X POST http://localhost:8080/orders \
+  -H "Content-Type: application/json" \
+  -H "X-Correlation-Id: ${CORR_ID}" \
+  -d '{"productId":"SKU-DEMO","quantity":1}'
+echo "Correlation ID: ${CORR_ID}"</code></pre>
+        </div>
+
+        <h3>Demo 4 — Kafka &amp; RabbitMQ at scale story (5 min)</h3>
+        <p>No need to deep-dive every chart — show that metrics arrive and explain production rollout:</p>
+        <ul>
+          <li><strong>Kafka:</strong> collector deployed per cluster or as gateway; <code>kafkametrics</code> scrapes all brokers; MSK/Confluent = same receiver, different bootstrap URLs.</li>
+          <li><strong>RabbitMQ:</strong> management plugin metrics; Amazon MQ exposes the same API pattern.</li>
+        </ul>
+      </section>
+
+      <section id="platform-mq">
+        <div class="step-meta"><span class="step-badge">IBM MQ</span></div>
+        <h2>IBM MQ — primary platform</h2>
+        <p>Java Contrib sidecar scrapes PCF every 15s. Sample order apps provide realistic APM edges (inventory + MQ PUT/GET).</p>
+        <div class="callout callout--info">
+          <p class="callout__title">Production note</p>
+          <p>At scale (thousands of queues), use metric dimensions for top-N dashboards and detectors. IBM <code>mq_otel</code> (in-process bindings) is an alternative when sidecars are not desired — see <a href="https://garrett-splunk.github.io/MQ-O11y-Workshop/" target="_blank" rel="noopener">MQ-O11y-Workshop</a>.</p>
+        </div>
+      </section>
+
+      <section id="platform-kafka">
+        <div class="step-meta"><span class="step-badge">Kafka</span></div>
+        <h2>Kafka</h2>
+        <p>Single-node KRaft broker in Compose. Collector uses the <a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/kafka-metrics-receiver" target="_blank" rel="noopener">kafkametrics</a> receiver (brokers, topics, consumers scrapers).</p>
+        <p><strong>Managed deployments:</strong> Amazon MSK, Confluent Cloud, and self-hosted Kafka all expose broker APIs the receiver can scrape — collector runs in ECS/EKS/EC2 alongside existing ADOT agents.</p>
+      </section>
+
+      <section id="platform-rabbit">
+        <div class="step-meta"><span class="step-badge">RabbitMQ</span></div>
+        <h2>RabbitMQ</h2>
+        <p>Management plugin on port 15672. Collector <a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/rabbitmq-receiver" target="_blank" rel="noopener">rabbitmq receiver</a> polls queue and node stats.</p>
+        <p><strong>Cloud:</strong> AWS Amazon MQ and Azure-hosted RabbitMQ expose the same management API pattern — point the receiver at the managed endpoint with appropriate credentials.</p>
+        <p class="muted"><strong>ActiveMQ</strong> follow-on: JMX → OTel JMX receiver or Prometheus JMX exporter → collector scrape. Not in this Compose stack.</p>
+      </section>
+
+      <section id="dynatrace-map">
+        <h2>Dynatrace ↔ Splunk mapping</h2>
+        <p class="muted">Use during or after the customer’s Dynatrace MQ extension demo.</p>
+        <table class="info-table">
+          <thead><tr><th>Dynatrace (today)</th><th>Splunk Observability Cloud</th></tr></thead>
+          <tbody>
+            <tr><td>MQ extension — queue depth alerts</td><td>Metric Explorer + detector on <code>ibm.mq.queue.depth</code></td></tr>
+            <tr><td>MQ extension — QM / channel health</td><td><code>ibm.mq.*</code> infrastructure metrics</td></tr>
+            <tr><td>Kafka extension — broker / consumer lag</td><td><code>kafkametrics</code> consumer group metrics</td></tr>
+            <tr><td>RabbitMQ extension</td><td><code>rabbitmq</code> receiver metrics</td></tr>
+            <tr><td>Service flow / distributed traces</td><td>APM service map + Related Content</td></tr>
+            <tr><td>Problem → entity drill-down</td><td>Detector → metric chart → APM trace</td></tr>
+            <tr><td>Multiple extensions / agents</td><td>Single OTel Collector pipelines → one backend</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="splunk-views">
+        <h2>Splunk cheat sheet</h2>
+        <table class="info-table">
+          <thead><tr><th>View</th><th>Filter / search</th></tr></thead>
+          <tbody>
+            <tr><td>Environment</td><td><code>deployment.environment:messaging-demo-lab</code></td></tr>
+            <tr><td>MQ depth</td><td>Metric: <code>ibm.mq.queue.depth</code> · dimension <code>queue = ORDER.REQ</code></td></tr>
+            <tr><td>APM services</td><td><code>order-producer</code>, <code>order-consumer</code>, <code>inventory-service</code></td></tr>
+            <tr><td>Kafka</td><td>Search metrics containing <code>kafka</code> (broker / consumer group series from kafkametrics)</td></tr>
+            <tr><td>RabbitMQ</td><td>Search metrics containing <code>rabbitmq</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="facilitator-setup">
+        <h2>Facilitator setup</h2>
+        <p class="muted">For your prep — not intended as a customer hands-on lab.</p>
+
+        <details class="facilitator" open>
+          <summary>Quick start</summary>
+          <div class="facilitator__body">
+            <div class="code-block">
+              <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-start">Copy</button></div>
+              <pre><code id="cmd-start">git clone https://github.com/garrett-splunk/MQ-Rabbit-Kafka.git
+cd MQ-Rabbit-Kafka
+cp .env.example .env
+cp .env.splunk.example .env.splunk   # add Splunk ingest token
+docker compose up --build -d
+bash scripts/verify-stack.sh</code></pre>
+            </div>
+            <p>Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>
+          </div>
+        </details>
+
+        <details class="facilitator">
+          <summary>Ports &amp; services</summary>
+          <div class="facilitator__body">
+            <table class="info-table">
+              <thead><tr><th>Service</th><th>Port</th></tr></thead>
+              <tbody>
+                <tr><td>order-producer</td><td>8080</td></tr>
+                <tr><td>order-consumer</td><td>8081</td></tr>
+                <tr><td>inventory-service</td><td>8082</td></tr>
+                <tr><td>IBM MQ</td><td>1414, 9443</td></tr>
+                <tr><td>Kafka</td><td>9092</td></tr>
+                <tr><td>RabbitMQ</td><td>5672, 15672</td></tr>
+                <tr><td>OTel Collector</td><td>4317, 4318, 13133</td></tr>
+                <tr><td>Demo site (local)</td><td>8092</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+        <details class="facilitator">
+          <summary>Teardown</summary>
+          <div class="facilitator__body">
+            <div class="code-block">
+              <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-down">Copy</button></div>
+              <pre><code id="cmd-down">docker compose down -v</code></pre>
+            </div>
+          </div>
+        </details>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
