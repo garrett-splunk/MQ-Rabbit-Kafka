@@ -454,6 +454,17 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
           <p>Do not assume <code>deployment.environment:messaging-demo-lab</code> works in the UI — Splunk often indexes/filters on the <code>.name</code> dimension for environment scoping. APM service views may accept either; start with <code>.name</code> if metrics look empty.</p>
         </div>
 
+        <div class="callout callout--warning">
+          <p class="callout__title">Gotcha — traces visible but no metrics?</p>
+          <ol class="show-steps">
+            <li><strong>Same token path as traces:</strong> metrics export via OTLP HTTP to <code>/v2/datapoint/otlp</code> (traces use <code>/v2/trace/otlp</code>). After changing <code>.env.splunk</code>, run <code>docker compose up -d otel-collector</code>.</li>
+            <li><strong>Restart MQ metrics sidecar:</strong> <code>docker compose restart ibm-mq-java-metrics</code> — it logs <code>Exporter failed</code> if the collector was down when it started.</li>
+            <li><strong>Metric names differ from docs:</strong> search Metric Explorer for <code>ibm.mq</code>, <code>kafka</code>, <code>rabbitmq</code>, or Rabbit series like <code>gauge.queue.messages_ready</code> — not always the literal OTel names.</li>
+            <li><strong>Wait 1–2 min</strong> after <code>run-demo.sh</code> (Kafka scrapes every 30s, Rabbit every 15s, MQ every 15s).</li>
+            <li><strong>Try without filter</strong> first to confirm ingest, then add <code>deployment.environment.name:messaging-demo-lab</code>.</li>
+          </ol>
+        </div>
+
         <table class="info-table">
           <thead><tr><th>View</th><th>Filter / search</th><th>When to use (troubleshooting)</th></tr></thead>
           <tbody>
@@ -508,13 +519,14 @@ SPLUNK_API_URL=https://api.us1.signalfx.com</code></pre>
           <li>Paste into <code>.env.splunk</code> as <code>SPLUNK_ACCESS_TOKEN</code></li>
         </ol>
 
-        <h3>Step 4 — Restart the collector</h3>
+        <h3>Step 4 — Restart the collector (and MQ metrics sidecar)</h3>
         <div class="code-block">
           <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-splunk-restart">Copy</button></div>
           <pre><code id="cmd-splunk-restart">docker compose up -d otel-collector
+docker compose restart ibm-mq-java-metrics
 docker compose logs otel-collector --tail 20</code></pre>
         </div>
-        <p>Look for <code>Everything is ready</code> in collector logs — not auth/401 errors from the Splunk exporter.</p>
+        <p>Look for <code>Everything is ready</code> in collector logs — not auth/401 errors. If APM traces work but metrics do not, the sidecar restart fixes most MQ metric gaps.</p>
 
         <h3>Step 5 — Confirm data in Splunk</h3>
         <ol class="checklist">
