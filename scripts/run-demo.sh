@@ -105,6 +105,10 @@ if [ "$ready" != true ]; then
   echo "WARN: Core endpoints not all ready yet; running verify-stack.sh anyway."
 fi
 
+# Sidecar caches OTLP connection; restart after collector is up
+docker compose restart ibm-mq-java-metrics >/dev/null 2>&1 || true
+sleep 5
+
 echo
 bash scripts/verify-stack.sh
 
