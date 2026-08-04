@@ -26,8 +26,8 @@ receivers:
 
   rabbitmq:
     endpoint: http://rabbitmq:15672
-    username: ${RABBITMQ_USER:-demo}
-    password: ${RABBITMQ_PASSWORD:-passw0rd}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASSWORD}
     collection_interval: 15s
 
 processors:
