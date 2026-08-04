@@ -43,4 +43,16 @@ for name in files:
 
 out_path.write_text(json.dumps(links, indent=2) + "\n", encoding="utf-8")
 print(f"Wrote {out_path}", file=sys.stderr)
+
+html_path = out_path.parent / "index.html"
+html = html_path.read_text()
+import re
+for key, url in links.items():
+    pattern = rf'(<a class="otelbin-link" data-otelbin-link="{re.escape(key)}" href=")[^"]*(")'
+    html, n = re.subn(pattern, rf'\1{url}\2', html)
+    if n == 0:
+        print(f"WARNING: no HTML anchor for {key}", file=sys.stderr)
+    else:
+        print(f"Patched index.html for {key} ({n})", file=sys.stderr)
+html_path.write_text(html, encoding="utf-8")
 PY
