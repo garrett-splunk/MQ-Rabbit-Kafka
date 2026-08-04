@@ -43,11 +43,11 @@ wait_for_url() {
 wait_for_url "order-producer health" "http://localhost:8080/health" order-producer || true
 wait_for_url "order-consumer health" "http://localhost:8081/health" order-consumer || true
 wait_for_url "inventory-service health" "http://localhost:8082/health" inventory-service || true
-check "otel-collector health" curl -sf "http://localhost:13133/"
-check "demo site" curl -sf "http://localhost:8092/" | grep -qi "Unified messaging"
-check "kafka healthy" docker compose ps --status running kafka 2>/dev/null | grep -q kafka
-check "rabbitmq healthy" docker compose ps --status running rabbitmq 2>/dev/null | grep -q rabbitmq
-check "ibm-mq-java-metrics running" docker compose ps --status running ibm-mq-java-metrics 2>/dev/null | grep -q ibm-mq-java-metrics
+check "otel-collector health" bash -c 'curl -sf "http://localhost:13133/" >/dev/null'
+check "demo site" bash -c 'curl -sf "http://localhost:8092/" | grep -qi "Unified messaging"'
+check "kafka healthy" bash -c 'docker compose ps --status running kafka 2>/dev/null | grep -q kafka'
+check "rabbitmq healthy" bash -c 'docker compose ps --status running rabbitmq 2>/dev/null | grep -q rabbitmq'
+check "ibm-mq-java-metrics running" bash -c 'docker compose ps --status running ibm-mq-java-metrics 2>/dev/null | grep -q ibm-mq-java-metrics'
 
 echo "== Sample MQ order =="
 RESP="$(curl -sf -X POST "http://localhost:8080/orders" \
