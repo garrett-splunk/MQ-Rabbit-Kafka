@@ -82,10 +82,18 @@ bash scripts/verify-stack.sh
 ## Demo scripts
 
 ```bash
-bash scripts/load-traffic.sh 10 200              # MQ orders
+load-messaging-demo                         # global command (from any directory)
+load-messaging-demo --mq 20 --kafka 30      # custom counts
+bash scripts/load-traffic.sh 10 200              # MQ orders only
 bash scripts/demo-incident-mq-backlog.sh         # stop consumer → depth alert story
 bash scripts/load-kafka-traffic.sh demo.orders 15
-bash scripts/load-rabbit-traffic.sh 10           # uses curl + management API (no pika)
+bash scripts/load-rabbit-traffic.sh 10           # curl + management API (no pika)
+```
+
+Install the global command once (symlink into `~/.local/bin`, same pattern as `launch-demo`):
+
+```bash
+ln -sf "$(pwd)/scripts/load-messaging-demo.sh" ~/.local/bin/load-messaging-demo
 ```
 
 ## Collector examples (OTelBin)
