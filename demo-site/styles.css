@@ -145,6 +145,11 @@ details.facilitator .facilitator__body { padding: 0 1rem 1rem; font-size: 0.875r
 }
 .info-table--compact td { font-size: 0.875rem; }
 
+.glossary-platform { margin: 2rem 0 1.5rem; padding-top: 0.5rem; border-top: 1px solid var(--color-border); }
+.glossary-platform:first-of-type { border-top: none; padding-top: 0; }
+.glossary-platform h3 { margin-top: 0; }
+.glossary-table td:first-child { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.82rem; white-space: nowrap; }
+
 .checklist { list-style: none; padding: 0; }
 .checklist li { position: relative; padding-left: 1.5rem; margin-bottom: 0.5rem; }
 .checklist li::before { content: ""; position: absolute; left: 0; top: 0.45em; width: 0.55rem; height: 0.55rem; border: 2px solid var(--color-accent); border-radius: 2px; }
