@@ -131,6 +131,19 @@ details.facilitator .facilitator__body { padding: 0 1rem 1rem; font-size: 0.875r
 .info-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-ink-muted); }
 .otelbin-link { font-weight: 600; white-space: nowrap; }
 .otelbin-table td:last-child { width: 9rem; }
+.otelbin-pieces { display: grid; gap: 1rem; margin: 1.25rem 0 1.5rem; }
+.otelbin-piece { margin: 0; }
+.otelbin-piece .muted { margin: 0 0 0.75rem; font-size: 0.9rem; }
+.info-table--compact th[scope="row"] {
+  width: 11rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-muted);
+  vertical-align: top;
+  white-space: nowrap;
+}
+.info-table--compact td { font-size: 0.875rem; }
 
 .checklist { list-style: none; padding: 0; }
 .checklist li { position: relative; padding-left: 1.5rem; margin-bottom: 0.5rem; }
