@@ -90,6 +90,15 @@ body { margin: 0; font-family: var(--font-body); font-size: 1.05rem; line-height
 .callout--warning { --callout-color: #ea580c; }
 .callout--value { --callout-color: #ff007f; border-width: 4px; }
 .callout--value .callout__title { font-size: 0.72rem; }
+.callout--show { --callout-color: #2563eb; }
+.callout--troubleshoot { --callout-color: #0d9488; }
+.callout--show .callout__title,
+.callout--troubleshoot .callout__title { font-size: 0.72rem; }
+.callout ol.show-steps { margin: 0.5rem 0 0; padding-left: 1.25rem; font-size: 0.92rem; }
+.callout ol.show-steps li { margin-bottom: 0.35rem; }
+.callout ol.show-steps li:last-child { margin-bottom: 0; }
+.callout .value-line { margin: 0.5rem 0 0; padding-top: 0.5rem; border-top: 1px dashed color-mix(in oklab, var(--callout-color) 35%, transparent); font-size: 0.92rem; }
+.callout .value-line strong { color: var(--callout-color); }
 
 details.facilitator { margin: 1.25rem 0; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
 details.facilitator summary { padding: 0.75rem 1rem; cursor: pointer; font-weight: 600; font-size: 0.875rem; }
