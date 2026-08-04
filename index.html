@@ -43,6 +43,7 @@
         <li><a href="#dynatrace-map" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Dynatrace mapping</a></li>
         <li><a href="#splunk-views" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Splunk cheat sheet</a></li>
         <li><a href="#facilitator-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⚙</span> Facilitator setup</a></li>
+        <li><a href="#splunk-token" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🔑</span> Splunk token</a></li>
       </ul>
       <div class="sidebar-footer">
         <a href="https://github.com/garrett-splunk/MQ-Rabbit-Kafka" target="_blank" rel="noopener">Clone repo</a>
@@ -454,6 +455,67 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         </table>
       </section>
 
+      <section id="splunk-token">
+        <h2>Splunk access token</h2>
+        <p class="muted">Required for metrics and APM to appear in Splunk Observability Cloud. The local demo stack runs without it; Splunk ingest does not.</p>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">Where to put your token</p>
+          <p>Create or edit <strong><code>.env.splunk</code></strong> in the repo root (same folder as <code>docker-compose.yml</code>). This file is <strong>gitignored</strong> — your token stays on your machine only.</p>
+        </div>
+
+        <h3>Step 1 — Create the file</h3>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-splunk-create">Copy</button></div>
+          <pre><code id="cmd-splunk-create">cd MQ-Rabbit-Kafka
+cp .env.splunk.example .env.splunk</code></pre>
+        </div>
+
+        <h3>Step 2 — Paste your ingest token</h3>
+        <p>Open <code>.env.splunk</code> in Cursor or your editor and replace the placeholder on <code>SPLUNK_ACCESS_TOKEN</code>:</p>
+        <div class="code-block">
+          <div class="code-block__header"><span>.env.splunk</span><button class="btn-copy" data-copy="cmd-splunk-file">Copy</button></div>
+          <pre><code id="cmd-splunk-file">SPLUNK_REALM=us1
+SPLUNK_ACCESS_TOKEN=paste-your-ingest-token-here
+SPLUNK_INGEST_URL=https://ingest.us1.signalfx.com
+SPLUNK_API_URL=https://api.us1.signalfx.com</code></pre>
+        </div>
+        <ul>
+          <li>Use an <strong>Ingest</strong> access token (not an API token).</li>
+          <li>No quotes around the token. No spaces around <code>=</code>.</li>
+          <li>If your org is <code>us0</code>, <code>eu0</code>, etc., change <code>SPLUNK_REALM</code> and both URLs to match (see <code>.env.splunk.example</code> comments).</li>
+        </ul>
+
+        <h3>Step 3 — Get a token in Splunk O11y</h3>
+        <ol class="checklist">
+          <li>Open <strong>Splunk Observability Cloud</strong> → <strong>Settings</strong> (gear) → <strong>Organization Settings</strong></li>
+          <li><strong>Access Tokens</strong> → <strong>New Token</strong></li>
+          <li>Type: <strong>Ingest</strong> → create and copy the token (shown once)</li>
+          <li>Paste into <code>.env.splunk</code> as <code>SPLUNK_ACCESS_TOKEN</code></li>
+        </ol>
+
+        <h3>Step 4 — Restart the collector</h3>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-splunk-restart">Copy</button></div>
+          <pre><code id="cmd-splunk-restart">docker compose up -d otel-collector
+docker compose logs otel-collector --tail 20</code></pre>
+        </div>
+        <p>Look for <code>Everything is ready</code> in collector logs — not auth/401 errors from the Splunk exporter.</p>
+
+        <h3>Step 5 — Confirm data in Splunk</h3>
+        <ol class="checklist">
+          <li>Run <code>bash scripts/run-demo.sh</code> or load traffic scripts</li>
+          <li><strong>Metric Explorer</strong> → filter <code>deployment.environment:messaging-demo-lab</code></li>
+          <li>Search <code>ibm.mq.queue.depth</code>, <code>kafka</code>, or <code>rabbitmq</code></li>
+          <li><strong>APM</strong> → services <code>order-producer</code>, <code>order-consumer</code>, <code>inventory-service</code></li>
+        </ol>
+
+        <div class="callout callout--warning">
+          <p class="callout__title">Do not commit .env.splunk</p>
+          <p>Only <code>.env.splunk.example</code> (placeholder values) belongs in git. If you accidentally commit a token, revoke it in Splunk and create a new one.</p>
+        </div>
+      </section>
+
       <section id="facilitator-setup">
         <h2>Facilitator setup</h2>
         <p class="muted">For your prep — not intended as a customer hands-on lab.</p>
@@ -465,10 +527,11 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
               <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-start">Copy</button></div>
               <pre><code id="cmd-start">git clone https://github.com/garrett-splunk/MQ-Rabbit-Kafka.git
 cd MQ-Rabbit-Kafka
-cp .env.splunk.example .env.splunk   # add Splunk ingest token
-bash scripts/run-demo.sh             # build, start, verify, load traffic</code></pre>
+cp .env.splunk.example .env.splunk
+# Edit .env.splunk — paste SPLUNK_ACCESS_TOKEN (see Splunk token section)
+bash scripts/run-demo.sh</code></pre>
             </div>
-            <p>Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>
+            <p>Full token setup: <a href="#splunk-token">Splunk access token</a> · Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>
           </div>
         </details>
 
