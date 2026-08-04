@@ -36,6 +36,7 @@
         <li><a href="#value" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">★</span> Splunk value adds</a></li>
         <li><a href="#architecture" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Architecture</a></li>
         <li><a href="#otelbin-examples" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⎈</span> OTelBin configs</a></li>
+        <li><a href="#otelbin-at-scale" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Queues at scale</a></li>
         <li><a href="#demo-script" class="sidebar-tree__link" data-step="1"><span class="sidebar-tree__num">1</span> Demo script</a></li>
         <li><a href="#troubleshooting" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🔍</span> Troubleshooting playbook</a></li>
         <li><a href="#platform-mq" class="sidebar-tree__link" data-step="2"><span class="sidebar-tree__num">2</span> IBM MQ</a></li>
@@ -290,6 +291,48 @@
             <li><strong>MQ is different</strong> — deploy sidecar + collector <code>otlp</code> receiver; in OTelBin you will see metrics enter via OTLP, not an <code>ibm.mq</code> receiver block.</li>
             <li><strong>Unified lab</strong> — <code>collector/otelcol-config.yaml</code> merges all three: <code>otlp</code> + <code>kafkametrics</code> + <code>rabbitmq</code> on one metrics pipeline.</li>
           </ol>
+        </div>
+
+        <h3 id="otelbin-at-scale">At scale — hundreds or thousands of queues</h3>
+        <p><strong>Not one collector or YAML file per queue.</strong> Queues are <em>dimensions</em> on shared metrics (e.g. <code>ibm.mq.queue.depth</code> with <code>queue=…</code>, <code>queue_manager=…</code>). You deploy collectors and sidecars per <strong>host, cluster, or queue manager</strong>, then use filters and Splunk grouping — same pattern as Dynatrace MQ extension at State Street scale.</p>
+
+        <table class="info-table">
+          <thead><tr><th>Platform</th><th>What you deploy</th><th>How queues are covered</th><th>Cardinality control</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="platform-badge platform-badge--mq">IBM MQ</span></td>
+              <td>One <strong>ibm-mq-metrics sidecar per queue manager</strong> (or pod per QM in K8s) · one collector can receive OTLP from many sidecars</td>
+              <td>Sidecar <code>queueFilters</code> in <code>config.yml</code> — include/exclude patterns (e.g. <code>ORDER.*</code>, exclude <code>SYSTEM*</code>), not a line per queue · multiple QMs in one sidecar config file</td>
+              <td>Tier 1: all business queues via wildcards · Tier 2: exclude temp/system · Tier 3: split sidecars by QM or region if PCF load is high · increase <code>numberOfThreads</code> for large estates</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--rmq">RabbitMQ</span></td>
+              <td>One <strong>rabbitmq receiver</strong> per management endpoint (node or load-balanced API)</td>
+              <td>Receiver discovers <strong>all queues automatically</strong> via management API — zero queue names in YAML</td>
+              <td>Alert on critical vhost/queue name patterns in Splunk detectors · optional: separate receivers per vhost/cluster for isolation</td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--kafka">Kafka</span></td>
+              <td>One <strong>kafkametrics receiver</strong> per cluster (bootstrap brokers)</td>
+              <td>Scrapers for brokers, topics, consumer groups — topics are dimensions, not config entries</td>
+              <td><code>topic_match</code> and <code>group_match</code> regex to skip internal topics (<code>^[^_].*$</code> default) · one config template per cluster, not per topic</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">Deployment tiers (typical enterprise)</p>
+          <ol class="show-steps">
+            <li><strong>Collector gateway</strong> — regional or platform OTel Collectors (EKS/ECS/VM) with one metrics pipeline → <code>signalfx</code>. Many MQ sidecars and app agents send OTLP inward.</li>
+            <li><strong>Edge / per-QM sidecar</strong> — Java Contrib beside each queue manager; same YAML template, swap QM host/name via env or Helm values.</li>
+            <li><strong>Splunk layer</strong> — one detector on <code>ibm.mq.queue.depth</code> grouped by <code>queue_manager</code> + <code>queue</code>; top-N charts; filter <code>queue:ORDER.*</code> — not 1,000 dashboards.</li>
+            <li><strong>GitOps</strong> — one Helm chart / Ansible role: collector config is static; <code>queueFilters</code> and env vars vary per QM from inventory (CMDB, IR360 export, tags).</li>
+          </ol>
+        </div>
+
+        <div class="callout callout--troubleshoot">
+          <p class="callout__title">Say this — vs “one config per queue”</p>
+          <p>“Dynatrace MQ extension does not need a JSON file per queue either — it discovers queues and alerts on dimensions. OTel is the same: <strong>one scrape path, many time series</strong>. You tune <em>include/exclude filters</em> and <em>Splunk detectors</em>, not collector count. IR360 still owns capacity planning for thousands of queues; Splunk owns <strong>which queue is breaching SLA right now</strong>.”</p>
         </div>
 
         <p class="muted">This lab’s live Compose config merges all three messaging paths: <code>collector/otelcol-config.yaml</code>.</p>
