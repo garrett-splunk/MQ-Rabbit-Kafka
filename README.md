@@ -42,7 +42,9 @@ Get a token: **Splunk O11y → Settings → Organization Settings → Access Tok
 
 After editing, restart the collector: `docker compose up -d otel-collector`
 
-**Splunk filter:** `deployment.environment:messaging-demo-lab`
+**Splunk filter (Metric Explorer):** `deployment.environment.name:messaging-demo-lab`
+
+> **Gotcha:** Use `deployment.environment.name`, not `deployment.environment` — the UI often only matches on `.name`.
 
 See [demo guide — Splunk token](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#splunk-token) for full steps.
 

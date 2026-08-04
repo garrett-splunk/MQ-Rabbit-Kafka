@@ -133,7 +133,7 @@ echo
 echo "== Demo ready =="
 echo "  Demo guide:     http://localhost:8092"
 echo "  MQ producer:    http://localhost:8080/health"
-echo "  Splunk filter:  deployment.environment:messaging-demo-lab"
+echo "  Splunk filter:  deployment.environment.name:messaging-demo-lab"
 echo "  GitHub Pages:   https://garrett-splunk.github.io/MQ-Rabbit-Kafka/"
 echo
 echo "Useful follow-ups:"

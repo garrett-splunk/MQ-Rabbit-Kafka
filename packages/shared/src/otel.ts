@@ -35,7 +35,7 @@ export function initObservability(options: ObservabilityOptions): void {
     options.deploymentEnvironment ||
     process.env.DEPLOYMENT_ENVIRONMENT ||
     process.env.NODE_ENV ||
-    'ibm-mq-lab';
+    'messaging-demo-lab';
 
   process.env.OTEL_SERVICE_NAME = serviceName;
 
