@@ -35,6 +35,7 @@
         <li><a href="#requirements" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Requirements map</a></li>
         <li><a href="#value" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">★</span> Splunk value adds</a></li>
         <li><a href="#architecture" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Architecture</a></li>
+        <li><a href="#otelbin-examples" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⎈</span> OTelBin configs</a></li>
         <li><a href="#demo-script" class="sidebar-tree__link" data-step="1"><span class="sidebar-tree__num">1</span> Demo script</a></li>
         <li><a href="#troubleshooting" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🔍</span> Troubleshooting playbook</a></li>
         <li><a href="#platform-mq" class="sidebar-tree__link" data-step="2"><span class="sidebar-tree__num">2</span> IBM MQ</a></li>
@@ -170,6 +171,50 @@
         </table>
       </section>
 
+      <section id="otelbin-examples">
+        <h2>OTelBin collector examples</h2>
+        <p class="muted">Open each configuration in <a href="https://www.otelbin.io/" target="_blank" rel="noopener">OTelBin</a> to visualize receiver → processor → exporter swimlanes and validate YAML before deploying. Source YAML lives in <code>collector/otelbin-examples/</code>; regenerate links with <code>bash scripts/generate-otelbin-links.sh</code>.</p>
+
+        <div class="callout callout--info">
+          <p class="callout__title">Presenter tip</p>
+          <p>Walk customers through the Splunk agent baseline first (traces via <code>otlp_http</code>, metrics via <code>signalfx</code>), then add one messaging receiver at a time. IBM MQ uses a Java Contrib sidecar that exports OTLP — the collector only needs an <code>otlp</code> receiver on the metrics pipeline.</p>
+        </div>
+
+        <table class="info-table otelbin-table">
+          <thead>
+            <tr><th>Example</th><th>What it shows</th><th>Reference docs</th><th>OTelBin</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Splunk OTel Collector agent</strong></td>
+              <td>Trimmed <code>agent_config.yaml</code> pattern: OTLP ingest, host metrics, <code>signalfx</code> + <code>otlp_http</code> exporters</td>
+              <td><a href="https://github.com/signalfx/splunk-otel-collector/blob/main/cmd/otelcol/config/collector/agent_config.yaml" target="_blank" rel="noopener">splunk-otel-collector agent_config.yaml</a></td>
+              <td><a class="otelbin-link" data-otelbin-link="splunk-agent-baseline" href="https://www.otelbin.io/" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--rmq">RabbitMQ</span> receiver</td>
+              <td>Management API scrape → <code>rabbitmq.message.current</code> and related metrics → Splunk</td>
+              <td><a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/rabbitmq-receiver" target="_blank" rel="noopener">Splunk rabbitmq receiver</a></td>
+              <td><a class="otelbin-link" data-otelbin-link="rabbitmq-receiver" href="https://www.otelbin.io/" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--kafka">Kafka</span> metrics receiver</td>
+              <td>Broker, topic, and consumer group scrapers → <code>kafka.broker.*</code> / <code>kafka.consumer.*</code></td>
+              <td><a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/kafka-metrics-receiver" target="_blank" rel="noopener">Splunk kafkametrics receiver</a></td>
+              <td><a class="otelbin-link" data-otelbin-link="kafka-metrics-receiver" href="https://www.otelbin.io/" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
+            </tr>
+            <tr>
+              <td><span class="platform-badge platform-badge--mq">IBM MQ</span> OTLP sidecar</td>
+              <td>Java Contrib <code>ibm-mq-metrics</code> → OTLP → collector → <code>ibm.mq.queue.depth</code> in Splunk</td>
+              <td><a href="https://github.com/open-telemetry/opentelemetry-java-contrib/tree/main/ibm-mq-metrics" target="_blank" rel="noopener">OpenTelemetry Java Contrib ibm-mq-metrics</a></td>
+              <td><a class="otelbin-link" data-otelbin-link="ibm-mq-otlp-sidecar" href="https://www.otelbin.io/" target="_blank" rel="noopener">Open in OTelBin ↗</a></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="muted">This lab’s live Compose config merges all three messaging paths: <code>collector/otelcol-config.yaml</code>.</p>
+      </section>
+
       <section id="demo-script">
         <div class="step-meta"><span class="step-badge">Live demo</span><span class="step-time">~45 min</span></div>
         <h2>Demo script</h2>
@@ -186,7 +231,7 @@
           <pre><code id="cmd-traffic-all">bash scripts/run-demo.sh                 # or load individually:
 bash scripts/load-traffic.sh 10 200          # MQ orders
 bash scripts/load-kafka-traffic.sh demo.orders 15
-bash scripts/load-rabbit-traffic.sh 10       # requires: pip install pika</code></pre>
+bash scripts/load-rabbit-traffic.sh 10       # curl + RabbitMQ management API</code></pre>
         </div>
 
         <div class="callout callout--show">
@@ -376,6 +421,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         <div class="step-meta"><span class="step-badge">IBM MQ</span></div>
         <h2>IBM MQ — primary platform</h2>
         <p>Java Contrib sidecar scrapes PCF every 15s. Sample order apps provide realistic APM edges (inventory + MQ PUT/GET).</p>
+        <p><a class="otelbin-link" data-otelbin-link="ibm-mq-otlp-sidecar" href="https://www.otelbin.io/" target="_blank" rel="noopener">OTelBin — IBM MQ OTLP collector pipeline ↗</a></p>
 
         <div class="callout callout--show">
           <p class="callout__title">Show this — MQ-specific Splunk views</p>
@@ -397,6 +443,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         <div class="step-meta"><span class="step-badge">Kafka</span></div>
         <h2>Kafka</h2>
         <p>Single-node KRaft broker in Compose. Collector uses the <a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/kafka-metrics-receiver" target="_blank" rel="noopener">kafkametrics</a> receiver (brokers, topics, consumers scrapers).</p>
+        <p><a class="otelbin-link" data-otelbin-link="kafka-metrics-receiver" href="https://www.otelbin.io/" target="_blank" rel="noopener">OTelBin — Kafka metrics receiver pipeline ↗</a></p>
         <p><strong>Managed deployments:</strong> Amazon MSK, Confluent Cloud, and self-hosted Kafka all expose broker APIs the receiver can scrape — collector runs in ECS/EKS/EC2 alongside existing ADOT agents.</p>
 
         <div class="callout callout--show">
@@ -414,6 +461,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         <div class="step-meta"><span class="step-badge">RabbitMQ</span></div>
         <h2>RabbitMQ</h2>
         <p>Management plugin on port 15672. Collector <a href="https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/collector-components/receivers/rabbitmq-receiver" target="_blank" rel="noopener">rabbitmq receiver</a> polls queue and node stats.</p>
+        <p><a class="otelbin-link" data-otelbin-link="rabbitmq-receiver" href="https://www.otelbin.io/" target="_blank" rel="noopener">OTelBin — RabbitMQ receiver pipeline ↗</a></p>
         <p><strong>Cloud:</strong> AWS Amazon MQ and Azure-hosted RabbitMQ expose the same management API pattern — point the receiver at the managed endpoint with appropriate credentials.</p>
         <p class="muted"><strong>ActiveMQ</strong> follow-on: JMX → OTel JMX receiver or Prometheus JMX exporter → collector scrape. Not in this Compose stack.</p>
 
@@ -460,9 +508,11 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
           <ol class="show-steps">
             <li><strong>Same token path as traces:</strong> metrics export via OTLP HTTP to <code>/v2/datapoint/otlp</code> (traces use <code>/v2/trace/otlp</code>). After changing <code>.env.splunk</code>, run <code>docker compose up -d otel-collector</code>.</li>
             <li><strong>Restart MQ metrics sidecar:</strong> <code>docker compose restart ibm-mq-java-metrics</code> — it logs <code>Exporter failed</code> if the collector was down when it started.</li>
-            <li><strong>Metric names differ from docs:</strong> MQ = <code>ibm.mq.queue.depth</code>; Rabbit = <code>rabbitmq.message.current</code> (not <code>gauge.queue.*</code> from other integrations); Kafka = <code>kafka.broker.*</code> / <code>kafka.topic.*</code>.</li>
+            <li><strong>MQ sidecar exporting to wrong host:</strong> if logs show <code>Failed to connect to localhost:4317</code>, rebuild the sidecar — it must use <code>http://otel-collector:4318</code> (HTTP/protobuf), not gRPC on localhost.</li>
+            <li><strong>Try without the environment filter first:</strong> search <code>ibm.mq.queue.depth</code> or <code>rabbitmq.message.current</code> with no filter, then add <code>deployment.environment.name:messaging-demo-lab</code>.</li>
+            <li><strong>Metric names differ from legacy integrations:</strong> OTel Rabbit = <code>rabbitmq.message.current</code> (dim <code>message.state=ready</code>), not old <code>gauge.queue.messages_ready</code> from collectd/Dynatrace.</li>
             <li><strong>Rabbit needs a queue:</strong> run <code>bash scripts/load-rabbit-traffic.sh 10</code> — empty Rabbit has no queue-level metrics.</li>
-            <li><strong>MQ sidecar:</strong> if logs show <code>Exporter failed</code>, run <code>docker compose up -d --build ibm-mq-java-metrics otel-collector</code> (sidecar now waits for collector on startup).</li>
+            <li><strong>MQ sidecar:</strong> if logs show <code>Exporter failed</code>, run <code>docker compose up -d --build ibm-mq-java-metrics otel-collector</code> (sidecar waits for collector on startup).</li>
           </ol>
         </div>
 
@@ -472,7 +522,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
             <tr><td>Environment (metrics)</td><td><code>deployment.environment.name:messaging-demo-lab</code></td><td>Always — scopes Metric Explorer to this stack</td></tr>
             <tr><td>Environment (APM)</td><td><code>deployment.environment:messaging-demo-lab</code> or <code>deployment.environment.name:messaging-demo-lab</code></td><td>Service map / traces if needed</td></tr>
             <tr><td>MQ depth</td><td>Metric: <code>ibm.mq.queue.depth</code> · dims <code>queue = ORDER.REQ</code>, <code>queue_manager = QM1</code></td><td>Backlog incidents — requires MQ sidecar exporting (see gotchas)</td></tr>
-            <tr><td>RabbitMQ depth</td><td>Metric: <code>rabbitmq.message.current</code> · dim <code>state = ready</code> · <code>rabbitmq.queue.name = demo.orders</code></td><td>Queue must exist — run <code>load-rabbit-traffic.sh</code></td></tr>
+            <tr><td>RabbitMQ depth</td><td>Metric: <code>rabbitmq.message.current</code> · dim <code>message.state = ready</code> · <code>rabbitmq.queue.name = demo.orders</code></td><td>Queue must exist — run <code>load-rabbit-traffic.sh</code></td></tr>
             <tr><td>Kafka</td><td>Search <code>kafka.broker</code>, <code>kafka.consumer</code>, <code>kafka.topic</code> (kafkametrics names)</td><td>After <code>load-kafka-traffic.sh</code>; scrape every 30s</td></tr>
             <tr><td>MQ APM — producer</td><td>Service <code>order-producer</code> · span <code>mq.put.order</code></td><td>Confirm upstream still publishing</td></tr>
             <tr><td>MQ APM — consumer</td><td>Service <code>order-consumer</code> · span <code>mq.get.order</code></td><td>Confirm downstream consuming; absence = app issue</td></tr>
@@ -521,7 +571,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
           <p class="callout__title">Show this — side-by-side with Splunk</p>
           <ol class="show-steps">
             <li><strong>MQ:</strong> Open Web Console → Queues → <code>ORDER.REQ</code> current depth. Splunk: <code>ibm.mq.queue.depth</code> with <code>queue=ORDER.REQ</code>.</li>
-            <li><strong>RabbitMQ:</strong> Management UI → Queues → <code>demo.orders</code>. Run <code>bash scripts/load-rabbit-traffic.sh 10</code> first. Splunk: <code>rabbitmq.message.current</code>, <code>state=ready</code>.</li>
+            <li><strong>RabbitMQ:</strong> Management UI → Queues → <code>demo.orders</code>. Run <code>bash scripts/load-rabbit-traffic.sh 10</code> first. Splunk: <code>rabbitmq.message.current</code>, <code>message.state=ready</code>.</li>
             <li><strong>Kafka:</strong> Terminal topic list + Splunk metrics starting with <code>kafka.broker</code> or <code>kafka.topic</code>.</li>
           </ol>
         </div>
