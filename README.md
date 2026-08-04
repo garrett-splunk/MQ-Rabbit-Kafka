@@ -15,9 +15,36 @@ Presenter demo for enterprise customers running multiple messaging platforms (of
 ```bash
 git clone https://github.com/garrett-splunk/MQ-Rabbit-Kafka.git
 cd MQ-Rabbit-Kafka
-cp .env.splunk.example .env.splunk   # add Splunk ingest token (optional for local UI only)
+cp .env.splunk.example .env.splunk
+# Edit .env.splunk — set SPLUNK_ACCESS_TOKEN (see below)
 bash scripts/run-demo.sh             # build, start, verify, load MQ + Kafka + Rabbit traffic
 ```
+
+### Splunk access token
+
+Put your **ingest token** in **`.env.splunk`** at the repo root (gitignored — never commit it):
+
+```bash
+cp .env.splunk.example .env.splunk
+nano .env.splunk   # or open in Cursor
+```
+
+Set these lines (match realm/URLs to your org):
+
+```
+SPLUNK_REALM=us1
+SPLUNK_ACCESS_TOKEN=your-ingest-token-here
+SPLUNK_INGEST_URL=https://ingest.us1.signalfx.com
+SPLUNK_API_URL=https://api.us1.signalfx.com
+```
+
+Get a token: **Splunk O11y → Settings → Organization Settings → Access Tokens → New Token (Ingest)**.
+
+After editing, restart the collector: `docker compose up -d otel-collector`
+
+**Splunk filter:** `deployment.environment:messaging-demo-lab`
+
+See [demo guide — Splunk token](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#splunk-token) for full steps.
 
 Or step by step:
 
@@ -27,8 +54,6 @@ cp .env.splunk.example .env.splunk
 docker compose up --build -d
 bash scripts/verify-stack.sh
 ```
-
-**Splunk filter:** `deployment.environment:messaging-demo-lab`
 
 ## What's in the stack
 
