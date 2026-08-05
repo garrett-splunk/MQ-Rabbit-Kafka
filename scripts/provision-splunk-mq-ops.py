@@ -80,6 +80,13 @@ def queue_group_dims() -> str:
     return "['messaging.destination.name', 'ibm.mq.queue.manager', 'ibm.mq.queue.type']"
 
 
+def oldest_age_clamped(group_by: str, label: str, window: str | None = None) -> str:
+    """IBM MQ returns -1 for oldest age on empty queues; clamp to 0 for charts/tables."""
+    agg = f".mean(over='{window}')" if window else ""
+    return f"""age = data('ibm.mq.oldest.msg.age', filter=env_filter){agg}.sum(by={group_by})
+max(age, 0).publish(label='{label}')"""
+
+
 class SplunkO11yClient:
     def __init__(self, token: str, base_v2: str, dry_run: bool = False) -> None:
         self.token = token
@@ -286,7 +293,7 @@ max_depth = data('ibm.mq.max.queue.depth', filter=env_filter).sum(by={gq}).publi
 
     oldest_age = f"""
 {el}
-data('ibm.mq.oldest.msg.age', filter=env_filter).sum(by={gq}).publish(label='Oldest message (s)')
+{oldest_age_clamped(gq, "Oldest message (s)")}
 """.strip()
 
     enq_deq = f"""
@@ -301,7 +308,7 @@ gq = {gq}
 depth = data('ibm.mq.queue.depth', filter=env_filter).mean(over='{tw}').sum(by=gq).publish(label='Depth')
 max_d = data('ibm.mq.max.queue.depth', filter=env_filter).mean(over='{tw}').sum(by=gq).publish(label='Max Depth')
 ((depth / max_d) * 100).publish(label='Depth %')
-data('ibm.mq.oldest.msg.age', filter=env_filter).mean(over='{tw}').sum(by=gq).publish(label='Oldest Msg (s)')
+{oldest_age_clamped("gq", "Oldest Msg (s)", tw)}
 enq_r = data('ibm.mq.message.enq.count', filter=env_filter).mean(over='{tw}').sum(by=gq).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Enqueue/min')
 deq_r = data('ibm.mq.message.deq.count', filter=env_filter).mean(over='{tw}').sum(by=gq).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Dequeue/min')
 (enq_r - deq_r).publish(label='Net flow/min')
@@ -403,7 +410,9 @@ detect(when(depth > threshold({depth_threshold}), lasting='5m')).publish('MQ que
 
     age_det = f"""
 {el}
-age = data('ibm.mq.oldest.msg.age', filter=env_filter).max(by={gq})
+gq = {gq}
+raw_age = data('ibm.mq.oldest.msg.age', filter=env_filter).max(by=gq)
+age = max(raw_age, 0)
 detect(when(age > threshold({age_threshold}), lasting='5m')).publish('MQ oldest message age SLA')
 """.strip()
 
