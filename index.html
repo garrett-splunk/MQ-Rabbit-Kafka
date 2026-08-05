@@ -803,7 +803,7 @@ SPLUNK_API_URL=https://api.us1.signalfx.com</code></pre>
           <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-restart-sidecar">Copy</button></div>
           <pre><code id="cmd-restart-sidecar">cd MQ-Rabbit-Kafka
 docker compose restart ibm-mq-java-metrics
-python3 scripts/provision-splunk-mq-ops.py   # updates enqueue/dequeue chart math
+python3 scripts/provision-splunk-mq-ops.py
 docker compose logs ibm-mq-java-metrics --tail 15</code></pre>
         </div>
         <p>Wait ~30s, then confirm in Metric Explorer: <code>ibm.mq.oldest.msg.age</code>, <code>ibm.mq.message.enq.count</code>, <code>ibm.mq.max.queue.depth</code>.</p>
@@ -851,8 +851,10 @@ docker compose logs ibm-mq-java-metrics --tail 15</code></pre>
           <p class="callout__title">Fix before the room (2 commands)</p>
           <div class="code-block">
             <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-warm-dashboard">Copy</button></div>
-            <pre><code id="cmd-warm-dashboard">python3 scripts/provision-splunk-mq-ops.py   # per-table groupBy + 5m averages
-bash scripts/warm-mq-dashboard.sh             # ~2 min sustained orders (run 3 min before showtime)</code></pre>
+            <pre><code id="cmd-warm-dashboard"># Per-table groupBy + 5m averages (run each line separately)
+python3 scripts/provision-splunk-mq-ops.py
+# ~2 min sustained orders — run ~3 min before showtime
+bash scripts/warm-mq-dashboard.sh</code></pre>
           </div>
           <p>Re-open the dashboard with time range <strong>Last 15 minutes</strong>. Tables should show one row per queue/QM/channel with numeric columns filled.</p>
         </div>
@@ -870,7 +872,7 @@ bash scripts/warm-mq-dashboard.sh             # ~2 min sustained orders (run 3 m
           <thead><tr><th>Table column</th><th>Healthy demo</th><th>During backlog incident</th><th>Say this</th></tr></thead>
           <tbody>
             <tr><td><code>Depth</code> / <code>Depth %</code></td><td>Low on ORDER.REQ</td><td>Climbs toward max</td><td>“Capacity view — same as Dynatrace depth %”</td></tr>
-            <tr><td><code>Oldest Msg (s)</code></td><td>0 (empty queue)</td><td>600+ and rising</td><td>“SLA clock — needs MONQ + messages waiting”</td></tr>
+            <tr><td><code>Oldest Msg (s)</code></td><td>0 on empty queues</td><td>600+ on ORDER.REQ</td><td>“SLA clock — IBM MQ sends <code>-1</code> when empty; dashboard clamps to 0”</td></tr>
             <tr><td><code>Enqueue/min</code> · <code>Dequeue/min</code></td><td>Both &gt; 0 after warm-up</td><td>Enqueue &gt; dequeue</td><td>“Producer vs consumer throughput in one row”</td></tr>
             <tr><td><code>Net flow/min</code></td><td>≈ 0</td><td>Positive</td><td>“Backlog building — alert candidate”</td></tr>
             <tr><td><code>Connections</code> (QM)</td><td>10–30</td><td>Stable</td><td>“Broker not the bottleneck”</td></tr>
@@ -1273,9 +1275,9 @@ docker compose logs otel-collector --tail 20</code></pre>
 cd MQ-Rabbit-Kafka
 cp .env.splunk.example .env.splunk
 # Edit .env.splunk — SPLUNK_ACCESS_TOKEN + SPLUNK_API_TOKEN (same org)
-bash scripts/validate-splunk-pipeline.sh          # confirm ingest before the call
-python3 scripts/provision-splunk-mq-ops.py   # MQ ops dashboard + detectors
-bash scripts/warm-mq-dashboard.sh            # fill table columns (~3 min before showtime)
+bash scripts/validate-splunk-pipeline.sh
+python3 scripts/provision-splunk-mq-ops.py
+bash scripts/warm-mq-dashboard.sh
 bash scripts/run-demo.sh</code></pre>
             </div>
             <p>Full token setup: <a href="#splunk-token">Splunk access token</a> · Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>
