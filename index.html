@@ -44,6 +44,7 @@
         <li><a href="#platform-rabbit" class="sidebar-tree__link" data-step="4"><span class="sidebar-tree__num">4</span> RabbitMQ</a></li>
         <li><a href="#dynatrace-map" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Dynatrace mapping</a></li>
         <li><a href="#splunk-views" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Splunk cheat sheet</a></li>
+        <li><a href="#metrics-glossary" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">📖</span> Metrics &amp; 101</a></li>
         <li><a href="#facilitator-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⚙</span> Facilitator setup</a></li>
         <li><a href="#platform-uis" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🖥</span> Platform UIs</a></li>
         <li><a href="#splunk-token" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🔑</span> Splunk token</a></li>
@@ -618,7 +619,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
 
       <section id="splunk-views">
         <h2>Splunk cheat sheet</h2>
-        <p class="muted">Copy-paste filters during live demos. Pair each row with the <a href="#troubleshooting">playbook</a> “what it tells you” column.</p>
+        <p class="muted">Copy-paste filters during live demos. Pair each row with the <a href="#troubleshooting">playbook</a> “what it tells you” column. For metric definitions and platform 101, see <a href="#metrics-glossary">Metrics glossary</a>.</p>
 
         <div class="callout callout--warning">
           <p class="callout__title">Gotcha — use <code>deployment.environment.name</code></p>
@@ -652,6 +653,94 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
             <tr><td>Trace by business ID</td><td>APM Traces · tag <code>correlation.id</code> or search correlation header value</td><td>“Order X failed” — find exact path</td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section id="metrics-glossary">
+        <h2>Metrics glossary &amp; messaging 101</h2>
+        <p class="muted">Use this section when the audience asks “what does this metric mean?” or when Splunk charts look flat/zero. Each platform uses different words for the same operational idea: <strong>messages waiting to be processed</strong>.</p>
+
+        <h3>Same problem, different names</h3>
+        <table class="info-table">
+          <thead><tr><th>Operational idea</th><th>IBM MQ</th><th>Kafka</th><th>RabbitMQ</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Backlog / work waiting</strong></td><td>Queue <strong>depth</strong> (messages on queue)</td><td>Consumer <strong>lag</strong> (offset behind log end)</td><td><strong>Ready</strong> messages (in queue, not yet delivered)</td></tr>
+            <tr><td><strong>Producer action</strong></td><td>PUT / MQPUT</td><td>Produce to topic/partition</td><td>Publish to exchange → routed to queue</td></tr>
+            <tr><td><strong>Consumer action</strong></td><td>GET / MQGET</td><td>Poll / fetch from partition</td><td>Deliver to consumer (may sit <strong>unacked</strong> until ACK)</td></tr>
+            <tr><td><strong>“Is the broker healthy?”</strong></td><td>Queue manager + channel status</td><td>Broker request handler idle, offline partitions</td><td>Node memory/disk alarms, connections</td></tr>
+            <tr><td><strong>Logical container</strong></td><td>Queue manager (QM) → queue</td><td>Cluster → topic → partition</td><td>Virtual host → queue</td></tr>
+          </tbody>
+        </table>
+
+        <article class="glossary-platform" id="glossary-mq">
+          <h3><span class="platform-badge platform-badge--mq">IBM MQ</span> — concepts &amp; metrics</h3>
+          <p><strong>101:</strong> A <strong>queue manager</strong> (QM1 in this lab) owns <strong>queues</strong> — named buffers where messages wait. Applications connect through a <strong>channel</strong> (<code>DEV.APP.SVRCONN</code> for apps, <code>MQOTEL.SVRCONN</code> for the metrics sidecar). Producers <strong>PUT</strong> to <code>ORDER.REQ</code>; consumers <strong>GET</strong>. If GET stops, <strong>depth</strong> rises — the primary backlog signal.</p>
+          <table class="info-table glossary-table">
+            <thead><tr><th>Metric</th><th>What it measures</th><th>Key dimensions</th><th>When it matters</th></tr></thead>
+            <tbody>
+              <tr><td><code>ibm.mq.queue.depth</code></td><td>Current message count on a queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>Backlog incidents — sustained rise = consumer down or too slow</td></tr>
+              <tr><td><code>ibm.mq.message.enq.count</code></td><td>Messages put (enqueued) on the queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>Confirm producers still sending</td></tr>
+              <tr><td><code>ibm.mq.message.deq.count</code></td><td>Messages got (dequeued) from the queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>Confirm consumers still reading; enqueue &gt;&gt; dequeue → depth grows</td></tr>
+              <tr><td><code>ibm.mq.manager.status</code></td><td>Queue manager health</td><td><code>queue_manager</code></td><td>QM down = all queues on that QM affected</td></tr>
+              <tr><td><code>ibm.mq.connection.count</code></td><td>Active client connections</td><td><code>queue_manager</code></td><td>Unexpected drop may indicate app or network issue</td></tr>
+              <tr><td><code>ibm.mq.open.input.count</code> / <code>open.output.count</code></td><td>Apps with queue open for GET / PUT</td><td><code>queue</code></td><td>Zero input opens with rising depth → no consumer</td></tr>
+              <tr><td><code>ibm.mq.heartbeat</code></td><td>Sidecar successfully scraped QM</td><td><code>queue_manager</code></td><td>Flatlines if sidecar or MQ client path failed</td></tr>
+            </tbody>
+          </table>
+          <p class="muted">Source: OpenTelemetry Java Contrib <code>ibm-mq-metrics</code> sidecar → OTLP → collector. APM spans: <code>mq.put.order</code>, <code>mq.get.order</code> on services <code>order-producer</code> / <code>order-consumer</code>.</p>
+        </article>
+
+        <article class="glossary-platform" id="glossary-kafka">
+          <h3><span class="platform-badge platform-badge--kafka">Kafka</span> — concepts &amp; metrics</h3>
+          <p><strong>101:</strong> Producers write to a <strong>topic</strong> split into <strong>partitions</strong> (ordered logs). <strong>Consumer groups</strong> read independently; each partition is consumed by one member in the group at a time. <strong>Lag</strong> = how far a consumer group’s offset is behind the latest message — Kafka’s equivalent of queue depth.</p>
+          <table class="info-table glossary-table">
+            <thead><tr><th>Metric family</th><th>What it measures</th><th>Key dimensions</th><th>When it matters</th></tr></thead>
+            <tbody>
+              <tr><td><code>kafka.broker.*</code></td><td>Broker throughput, request handlers, network</td><td>broker id, cluster</td><td>Broker overload or under-provisioned cluster</td></tr>
+              <tr><td><code>kafka.topic.*</code></td><td>Bytes/messages in topic, partition count</td><td><code>topic</code></td><td>Topic growth, retention issues</td></tr>
+              <tr><td><code>kafka.consumer.lag</code> (and related)</td><td>Messages / offset behind log end per partition</td><td><code>topic</code>, <code>partition</code>, consumer group</td><td>Primary backlog alert — same story as MQ depth</td></tr>
+              <tr><td><code>kafka.consumer.group.*</code></td><td>Group membership, commits</td><td>consumer group id</td><td>Rebalances, stuck consumers</td></tr>
+            </tbody>
+          </table>
+          <p class="muted">Source: OTel Collector <code>kafkametrics</code> receiver (brokers / topics / consumers scrapers). Scrape interval in this lab: 30s. Demo topic: <code>demo.orders</code>.</p>
+        </article>
+
+        <article class="glossary-platform" id="glossary-rabbit">
+          <h3><span class="platform-badge platform-badge--rmq">RabbitMQ</span> — concepts &amp; metrics</h3>
+          <p><strong>101:</strong> Producers <strong>publish</strong> to an <strong>exchange</strong>; routing rules deliver copies to <strong>queues</strong>. Consumers receive messages; until they <strong>ack</strong>, messages can sit in <strong>unacknowledged</strong> state. <strong>Ready</strong> = waiting in the queue; <strong>unacked</strong> = delivered but not confirmed. This lab uses queue <code>demo.orders</code> on the default vhost <code>/</code>.</p>
+
+          <div class="callout callout--warning">
+            <p class="callout__title">Gotcha — Rabbit metrics look like zero</p>
+            <ul>
+              <li><strong>Use <code>rabbitmq.message.current</code></strong> with dimension <code>message.state=ready</code> for backlog count — not legacy names like <code>gauge.queue.messages_ready</code>.</li>
+              <li><strong>Rate metrics</strong> (<code>rabbitmq.message.published</code>, <code>*_details.rate</code>) show <strong>0 when idle</strong> — that is normal if you are not actively publishing. Depth-style metrics should match Management UI “Ready”.</li>
+              <li><strong>Cumulative counters</strong> (<code>rabbitmq.message.published</code>) only increase; plot <strong>rate</strong> or use delta if you want “messages/sec”.</li>
+              <li><strong>Queue must exist</strong> before queue-level series appear — run <code>load-messaging-demo</code> or <code>load-rabbit-traffic.sh</code>.</li>
+              <li>In Metric Explorer, pick aggregation <strong>latest</strong> or <strong>mean</strong> for gauge-like depth; avoid max over long windows on sparse scrapes.</li>
+            </ul>
+          </div>
+
+          <table class="info-table glossary-table">
+            <thead><tr><th>Metric</th><th>What it measures</th><th>Key dimensions</th><th>When it matters</th></tr></thead>
+            <tbody>
+              <tr><td><code>rabbitmq.message.current</code></td><td>Messages on queue now</td><td><code>message.state</code> = <code>ready</code> or <code>unacknowledged</code>, <code>rabbitmq.queue.name</code></td><td><code>ready</code> = backlog; <code>unacknowledged</code> = slow/stuck consumers</td></tr>
+              <tr><td><code>rabbitmq.message.published</code></td><td>Total messages published (cumulative)</td><td>queue / node</td><td>Traffic volume; use rate for “publish/sec”</td></tr>
+              <tr><td><code>rabbitmq.message.delivered</code></td><td>Messages delivered to consumers (cumulative)</td><td>queue</td><td>Confirm downstream activity</td></tr>
+              <tr><td><code>rabbitmq.message.acknowledged</code></td><td>Messages ACK’d by consumers</td><td>queue</td><td>Delivered &gt;&gt; acked → possible consumer hang</td></tr>
+              <tr><td><code>rabbitmq.consumer.count</code></td><td>Consumers attached to queue</td><td><code>rabbitmq.queue.name</code></td><td>Zero consumers + rising ready = nobody reading</td></tr>
+              <tr><td><code>rabbitmq.node.mem_used</code> / <code>disk_free</code></td><td>Broker resource headroom</td><td>node name</td><td>Memory/disk alarms block publishers</td></tr>
+            </tbody>
+          </table>
+          <p class="muted">Source: OTel Collector <code>rabbitmq</code> receiver → Rabbit management API (<code>:15672</code>). Scrape interval: 15s. Verify locally: Management UI → Queues → <code>demo.orders</code> “Ready” column.</p>
+        </article>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — tie metric → UI → action</p>
+          <ol class="show-steps">
+            <li><strong>MQ:</strong> Rising <code>ibm.mq.queue.depth</code> on <code>ORDER.REQ</code> → check <code>order-consumer</code> spans / stop consumer demo.</li>
+            <li><strong>Kafka:</strong> Rising <code>kafka.consumer.lag</code> → consumer group not keeping up — scale consumers or fix poison message.</li>
+            <li><strong>Rabbit:</strong> Rising <code>rabbitmq.message.current</code> (<code>state=ready</code>) → no consumers or too slow; check <code>rabbitmq.consumer.count</code>.</li>
+          </ol>
+        </div>
       </section>
 
       <section id="platform-uis">
