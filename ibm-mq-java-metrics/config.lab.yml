@@ -21,7 +21,7 @@ queueManagers:
           values: ["SYSTEM", "AMQ"]
 
     channelFilters:
-      include: ["MQOTEL.*"]
+      include: ["MQOTEL.*", "DEV.*"]
       exclude:
         - type: "STARTSWITH"
           values: ["SYSTEM"]
@@ -56,6 +56,24 @@ metrics:
   "ibm.mq.connection.count":
     enabled: true
   "ibm.mq.heartbeat":
+    enabled: true
+  "ibm.mq.oldest.msg.age":
+    enabled: true
+  "ibm.mq.max.queue.depth":
+    enabled: true
+  "ibm.mq.manager.active.channels":
+    enabled: true
+  "ibm.mq.queue_manager.uptime":
+    enabled: true
+  "ibm.mq.byte.sent":
+    enabled: true
+  "ibm.mq.byte.received":
+    enabled: true
+  "ibm.mq.status":
+    enabled: true
+  "ibm.mq.message.sent.count":
+    enabled: true
+  "ibm.mq.message.received.count":
     enabled: true
 
 otlpExporter:

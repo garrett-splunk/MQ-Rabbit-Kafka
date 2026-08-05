@@ -38,11 +38,13 @@
         <li><a href="#otelbin-examples" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⎈</span> OTelBin configs</a></li>
         <li><a href="#otelbin-at-scale" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Queues at scale</a></li>
         <li><a href="#demo-script" class="sidebar-tree__link" data-step="1"><span class="sidebar-tree__num">1</span> Demo script</a></li>
+        <li><a href="#correlation-drill" class="sidebar-tree__link" data-step="1"><span class="sidebar-tree__num">↔</span> Correlation drill</a></li>
         <li><a href="#troubleshooting" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">🔍</span> Troubleshooting playbook</a></li>
         <li><a href="#platform-mq" class="sidebar-tree__link" data-step="2"><span class="sidebar-tree__num">2</span> IBM MQ</a></li>
         <li><a href="#platform-kafka" class="sidebar-tree__link" data-step="3"><span class="sidebar-tree__num">3</span> Kafka</a></li>
         <li><a href="#platform-rabbit" class="sidebar-tree__link" data-step="4"><span class="sidebar-tree__num">4</span> RabbitMQ</a></li>
         <li><a href="#dynatrace-map" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Dynatrace mapping</a></li>
+        <li><a href="#splunk-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">📊</span> Splunk setup</a></li>
         <li><a href="#splunk-views" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Splunk cheat sheet</a></li>
         <li><a href="#metrics-glossary" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">📖</span> Metrics &amp; 101</a></li>
         <li><a href="#facilitator-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⚙</span> Facilitator setup</a></li>
@@ -123,7 +125,7 @@
 
         <div class="callout callout--value">
           <p class="callout__title">Value add — Metrics + APM correlation in one UI</p>
-          <p>When <code>ibm.mq.queue.depth</code> spikes, jump to APM traces for <code>order-producer</code> / <code>order-consumer</code> and see <code>mq.put.order</code> / <code>mq.get.order</code> spans — tie infrastructure signals to application behavior without switching tools.</p>
+          <p>When <code>ibm.mq.queue.depth</code> spikes, jump to APM traces for <code>order-producer</code> / <code>order-consumer</code> and see <code>mq.put.order</code> / <code>mq.get.order</code> spans — tie infrastructure signals to application behavior without switching tools. See the <a href="#correlation-drill">correlation drill</a> for the click-path.</p>
         </div>
 
         <div class="callout callout--value">
@@ -393,6 +395,7 @@ bash scripts/load-rabbit-traffic.sh 10       # curl + RabbitMQ management API</c
             <li><strong>Restore:</strong> <code>docker compose start order-consumer</code> — depth drains; narrate auto-resolver / “problem cleared”</li>
           </ol>
           <p class="value-line"><strong>Troubleshooting value:</strong> Separates <em>producer still sending</em> vs <em>consumer down/slow</em> vs <em>channel/QM issue</em> in under two minutes. Same question ops ask in Dynatrace MQ extension — Splunk adds jump from depth chart to APM without a second tool.</p>
+          <p class="muted">Full click-path and Kafka/Rabbit extension: <a href="#correlation-drill">Correlation drill</a>.</p>
         </div>
 
         <div class="callout callout--troubleshoot">
@@ -424,13 +427,112 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
           <p class="callout__title">Show this — Trace correlation for one order</p>
           <ol class="show-steps">
             <li><strong>APM → Traces</strong> — filter service <code>order-producer</code>, time last 15 min</li>
-            <li>Open a trace; expand <code>POST /orders</code> → <code>inventory.reserve</code> → <code>mq.put.order</code></li>
-            <li>Note span attributes: <code>mq.queue</code>, <code>correlation.id</code> (or <code>X-Correlation-Id</code> tag)</li>
-            <li>Search traces for the same correlation ID on <code>order-consumer</code> — separate trace tree with <code>mq.get.order</code></li>
+            <li>Open a trace; expand <code>POST /orders</code> → <code>inventory.check</code> → <code>mq.put.order</code></li>
+            <li>Note span attributes: <code>messaging.destination.name = ORDER.REQ</code>, <code>messaging.system = ibmmq</code></li>
+            <li>Search traces for the same <code>CORR_ID</code> on <code>order-consumer</code> — separate trace tree with <code>mq.get.order</code> → <code>inventory.fulfill</code> (<code>order.id</code> = correlation ID)</li>
             <li><strong>Service map:</strong> highlight async path — HTTP sync leg + MQ async leg</li>
             <li>Optional: <strong>Related Content</strong> from a depth spike → “show me traces during this window”</li>
           </ol>
           <p class="value-line"><strong>Troubleshooting value:</strong> When a business team reports “order 8842 failed,” you search by correlation ID instead of guessing which queue or consumer instance. Bridges <em>business symptom</em> → <em>infrastructure metric</em> → <em>exact span</em> — the gap Dynatrace service flow fills today.</p>
+          <p class="muted">Step-by-step with cheat sheet: <a href="#correlation-drill">Correlation drill</a>.</p>
+        </div>
+
+        <h3 id="correlation-drill">Correlation drill — metric → trace → business ID</h3>
+        <p class="muted">Presenter crib sheet for tying <code>ibm.mq.queue.depth</code> to <code>order-producer</code> / <code>order-consumer</code> traces and correlation IDs — in one Splunk tenant, without switching tools when you add Kafka/Rabbit later.</p>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">What you are proving</p>
+          <table class="info-table">
+            <thead><tr><th>Signal</th><th>Source</th><th>Tie-breaker</th></tr></thead>
+            <tbody>
+              <tr><td>Backlog</td><td><code>ibm.mq.queue.depth</code> · <code>queue=ORDER.REQ</code></td><td>Infrastructure</td></tr>
+              <tr><td>Who is still working</td><td><code>order-producer</code> · <code>mq.put.order</code> vs <code>order-consumer</code> · <code>mq.get.order</code></td><td>APM</td></tr>
+              <tr><td>One order</td><td><code>X-Correlation-Id</code> header / <code>order.id</code> span attribute</td><td>Business ID</td></tr>
+            </tbody>
+          </table>
+          <p>MQ metrics (sidecar) and APM traces (apps) share the same collector and environment — you correlate with <strong>time range + <code>deployment.environment.name:messaging-demo-lab</code> + queue name + service names</strong>. If your org has Related Content enabled, depth charts may also link to services in one click.</p>
+        </div>
+
+        <p><strong>Prep before the room:</strong></p>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-correlation-prep">Copy</button></div>
+          <pre><code id="cmd-correlation-prep">cd ~/projects/MQ-Rabbit-Kafka   # or your clone path
+docker compose up -d
+load-messaging-demo              # MQ + Kafka + Rabbit traffic</code></pre>
+        </div>
+        <p class="muted">Global filter for every Splunk view below: <code>deployment.environment.name:messaging-demo-lab</code></p>
+
+        <h4>Story A — Backlog incident (pairs with Demo 2)</h4>
+        <p><strong>Narrative:</strong> “Depth is rising — is MQ broken, producer flooding, or consumer dead?”</p>
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — Metric → APM without leaving Splunk</p>
+          <ol class="show-steps">
+            <li><strong>Metric Explorer:</strong> plot <code>ibm.mq.queue.depth</code> · dims <code>queue = ORDER.REQ</code>, <code>queue_manager = QM1</code> — note the time range</li>
+            <li><strong>Cause incident:</strong> <code>bash scripts/demo-incident-mq-backlog.sh</code> then <code>load-messaging-demo --mq-only --mq 15</code> (or <code>load-traffic.sh 15 200</code>)</li>
+            <li>Watch depth climb (~60s on chart)</li>
+            <li><strong>APM → Services → order-producer</strong> (same time range) → Traces → expand <code>POST /orders</code> → <code>inventory.check</code> → <code>mq.put.order</code></li>
+            <li><strong>APM → Services → order-consumer</strong> — no new <code>mq.get.order</code> spans</li>
+            <li><strong>APM → Service map:</strong> producer → MQ active; consumer side quiet</li>
+            <li><strong>Restore:</strong> <code>docker compose start order-consumer</code> — depth drains; GET spans return</li>
+          </ol>
+          <p class="value-line"><strong>Say this:</strong> “Alert on <code>ibm.mq.queue.depth</code> for <code>ORDER.REQ</code> → same session → producer still PUTting → consumer has no GET — consumer problem, not broker.”</p>
+        </div>
+
+        <h4>Story B — One order by correlation ID (pairs with Demo 3)</h4>
+        <p><strong>Narrative:</strong> “Ops got a ticket for order <code>demo-173…</code> — find the path.”</p>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-correlation-order">Copy</button></div>
+          <pre><code id="cmd-correlation-order">CORR_ID="demo-$(date +%s)"
+curl -s -X POST http://localhost:8080/orders \
+  -H "Content-Type: application/json" \
+  -H "X-Correlation-Id: ${CORR_ID}" \
+  -d '{"productId":"SKU-DEMO","quantity":1}'
+echo "Correlation ID: ${CORR_ID}"</code></pre>
+        </div>
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — Business ID → two async trace trees</p>
+          <ol class="show-steps">
+            <li><strong>APM → Traces</strong> · service <code>order-producer</code> · search full-text for <code>CORR_ID</code> from terminal output</li>
+            <li>Producer tree: <code>inventory.check</code> → <code>mq.put.order</code> · attrs <code>messaging.destination.name</code>, <code>messaging.message_id</code></li>
+            <li><strong>APM → Traces</strong> · service <code>order-consumer</code> · search same <code>CORR_ID</code></li>
+            <li>Consumer tree: <code>mq.get.order</code> → <code>inventory.fulfill</code> · attr <code>order.id</code> = correlation ID</li>
+            <li><strong>Metric Explorer</strong> (optional): small blip on depth if orders pile up during incident window</li>
+          </ol>
+          <p class="value-line"><strong>Say this:</strong> “Async messaging = two trace trees, one business ID. Same as service flow — plus Kafka lag and Rabbit ready on the same tenant.”</p>
+        </div>
+
+        <div class="callout callout--tip">
+          <p class="callout__title">Presenter note — async traces</p>
+          <p>MQ does not propagate W3C trace context across the queue in this lab, so producer and consumer appear as <strong>separate traces</strong>. Link them by searching the correlation ID (HTTP header becomes <code>orderId</code> in the JSON payload and MQ CorrelId). Do not promise a single unified trace unless they add context propagation over MQ.</p>
+        </div>
+
+        <h4>Same tenant for Kafka &amp; Rabbit — no tool switch</h4>
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — After MQ, stay in Metric Explorer</p>
+          <ol class="show-steps">
+            <li>Keep filter <code>deployment.environment.name:messaging-demo-lab</code> and the same time range</li>
+            <li>Add plot: <code>kafka.consumer</code> / <code>kafka.broker</code> (after <code>load-messaging-demo</code>)</li>
+            <li>Add plot: <code>rabbitmq.message.current</code> · <code>message.state=ready</code> · <code>rabbitmq.queue.name=demo.orders</code></li>
+            <li>Point to <a href="#metrics-glossary">Metrics glossary</a>: depth ≈ lag ≈ ready messages</li>
+          </ol>
+          <p class="value-line"><strong>Troubleshooting value:</strong> One on-call queue, one runbook shape — not three Dynatrace extensions plus broker consoles.</p>
+        </div>
+
+        <table class="info-table">
+          <thead><tr><th>Step</th><th>Splunk location</th><th>What to look for</th></tr></thead>
+          <tbody>
+            <tr><td>Depth</td><td>Metric Explorer</td><td><code>ibm.mq.queue.depth</code> · <code>queue=ORDER.REQ</code></td></tr>
+            <tr><td>Producer healthy</td><td>APM → Services → <code>order-producer</code></td><td>Span <code>mq.put.order</code></td></tr>
+            <tr><td>Consumer healthy</td><td>APM → Services → <code>order-consumer</code></td><td>Span <code>mq.get.order</code></td></tr>
+            <tr><td>Business ticket</td><td>APM → Traces</td><td>Search <code>CORR_ID</code> or filter <code>order.id</code> on fulfill span</td></tr>
+            <tr><td>Kafka backlog</td><td>Metric Explorer</td><td><code>kafka.consumer</code> lag metrics</td></tr>
+            <tr><td>Rabbit backlog</td><td>Metric Explorer</td><td><code>rabbitmq.message.current</code> · ready</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--troubleshoot">
+          <p class="callout__title">One-line closer for the room</p>
+          <p>“Splunk ties <code>ibm.mq.queue.depth</code> to <code>order-consumer</code> traces and correlation IDs in one tenant — and the same pattern covers Kafka lag and Rabbit ready without switching tools.”</p>
         </div>
 
         <h3>Demo 4 — Kafka &amp; RabbitMQ at scale story (5 min)</h3>
@@ -512,6 +614,7 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         </table>
 
         <h3>Detector templates to mention (not live-built)</h3>
+        <p class="muted">Or run <code>python3 scripts/provision-splunk-mq-ops.py</code> to create these automatically — see <a href="#splunk-setup">Splunk setup</a>.</p>
         <div class="trouble-grid">
           <details open>
             <summary>MQ — sustained queue depth</summary>
@@ -606,7 +709,8 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
         <table class="info-table">
           <thead><tr><th>Dynatrace (today)</th><th>Splunk Observability Cloud</th></tr></thead>
           <tbody>
-            <tr><td>MQ extension — queue depth alerts</td><td>Metric Explorer + detector on <code>ibm.mq.queue.depth</code></td></tr>
+            <tr><td>MQ extension — queue depth alerts</td><td>Metric Explorer + detector on <code>ibm.mq.queue.depth</code> · <a href="#splunk-setup">provision script</a></td></tr>
+            <tr><td>MQ extension — queue / QM dashboards</td><td><a href="#splunk-setup">IBM MQ Ops dashboard</a> (depth %, oldest msg, queue table)</td></tr>
             <tr><td>MQ extension — QM / channel health</td><td><code>ibm.mq.*</code> infrastructure metrics</td></tr>
             <tr><td>Kafka extension — broker / consumer lag</td><td><code>kafkametrics</code> consumer group metrics</td></tr>
             <tr><td>RabbitMQ extension</td><td><code>rabbitmq</code> receiver metrics</td></tr>
@@ -615,6 +719,194 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
             <tr><td>Multiple extensions / agents</td><td>Single OTel Collector pipelines → one backend</td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section id="splunk-setup">
+        <h2>Splunk setup — dashboards &amp; alerting</h2>
+        <p class="muted">This lab ships <strong>metrics and traces</strong>, not pre-built Splunk content. Dynatrace’s MQ extension includes default queue dashboards and custom events; Splunk O11y gives you <strong>APM automatically</strong> and lets you define MQ/Kafka/Rabbit detectors once. Use the script below to stand up an <strong>MQ ops dashboard</strong> close to what customers expect from the extension.</p>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">What is automatic vs what you build</p>
+          <table class="info-table">
+            <thead><tr><th>Signal</th><th>Splunk O11y out of the box?</th><th>This demo</th></tr></thead>
+            <tbody>
+              <tr><td>APM service map &amp; RED metrics</td><td>Yes — after apps export traces</td><td><code>order-producer</code>, <code>order-consumer</code></td></tr>
+              <tr><td>IBM MQ / Kafka / Rabbit metric dashboards</td><td>No — custom OTLP metrics</td><td><code>provision-splunk-mq-ops.py</code> script</td></tr>
+              <tr><td>Queue depth / oldest message alerts</td><td>No — create detectors</td><td>Script creates <code>[MQ Demo]</code> detectors</td></tr>
+              <tr><td>AutoDetect (host, K8s, APM errors)</td><td>Yes — for supported integrations</td><td>Not tied to <code>ibm.mq.*</code> metrics</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Exact steps — first-time setup</h3>
+        <p class="muted">Follow in order. Total time ~15 minutes if the demo stack and ingest token already work.</p>
+
+        <h4>Step 1 — Confirm metrics are flowing</h4>
+        <ol class="checklist">
+          <li>Start the stack: <code>docker compose up -d</code> (or <code>bash scripts/run-demo.sh</code>)</li>
+          <li>Ensure <code>.env.splunk</code> has a valid <code>SPLUNK_ACCESS_TOKEN</code> (ingest) — see <a href="#splunk-token">Splunk token</a></li>
+          <li>Generate traffic: <code>load-messaging-demo</code></li>
+          <li>In Splunk: <strong>Metric Explorer</strong> → filter <code>deployment.environment.name:messaging-demo-lab</code> → search <code>ibm.mq.queue.depth</code></li>
+          <li>If empty, restart sidecar: <code>docker compose restart ibm-mq-java-metrics otel-collector</code></li>
+        </ol>
+
+        <h4>Step 2 — Create an API token (dashboard script only)</h4>
+        <ol class="checklist">
+          <li>Splunk Observability Cloud → <strong>Settings</strong> (gear, bottom left) → <strong>Organization Settings</strong></li>
+          <li><strong>Access Tokens</strong> → <strong>New Token</strong></li>
+          <li>Name: e.g. <code>mq-demo-dashboard-provision</code></li>
+          <li>Type: <strong>API</strong> (not Ingest)</li>
+          <li>Role: <strong>Admin</strong> or <strong>Power</strong> (required to create charts/dashboards/detectors)</li>
+          <li>Copy the token — shown once</li>
+        </ol>
+
+        <h4>Step 3 — Add the API token to <code>.env.splunk</code></h4>
+        <div class="code-block">
+          <div class="code-block__header"><span>.env.splunk</span><button class="btn-copy" data-copy="cmd-env-api-token">Copy</button></div>
+          <pre><code id="cmd-env-api-token">SPLUNK_REALM=us1
+SPLUNK_ACCESS_TOKEN=your-ingest-token-here
+SPLUNK_API_TOKEN=paste-api-token-here
+SPLUNK_INGEST_URL=https://ingest.us1.signalfx.com
+SPLUNK_API_URL=https://api.us1.signalfx.com</code></pre>
+        </div>
+        <p>Verify (does not print tokens): <code>grep -q '^SPLUNK_API_TOKEN=.' .env.splunk && echo OK</code></p>
+
+        <h4>Step 4 — Enable extended MQ metrics in the sidecar</h4>
+        <p>Pull latest repo (or use your local copy), then restart the metrics sidecar so oldest-message age, max depth, bytes, and channel stats export:</p>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-restart-sidecar">Copy</button></div>
+          <pre><code id="cmd-restart-sidecar">cd MQ-Rabbit-Kafka
+docker compose restart ibm-mq-java-metrics
+docker compose logs ibm-mq-java-metrics --tail 15</code></pre>
+        </div>
+        <p>Wait ~30s, then confirm new metrics in Metric Explorer: <code>ibm.mq.oldest.msg.age</code>, <code>ibm.mq.max.queue.depth</code> (may need traffic on <code>ORDER.REQ</code>).</p>
+
+        <h4>Step 5 — Preview what the script will create (optional)</h4>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-provision-dryrun">Copy</button></div>
+          <pre><code id="cmd-provision-dryrun">python3 scripts/provision-splunk-mq-ops.py --dry-run</code></pre>
+        </div>
+        <p>Prints API payloads without calling Splunk — useful to confirm SignalFlow and chart names.</p>
+
+        <h4>Step 6 — Run the provisioner</h4>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-provision-run">Copy</button></div>
+          <pre><code id="cmd-provision-run">python3 scripts/provision-splunk-mq-ops.py</code></pre>
+        </div>
+        <p>On success the script prints a dashboard URL like:</p>
+        <p><code>https://app.us1.signalfx.com/#/dashboard/&lt;id&gt;</code></p>
+        <p>Re-running updates existing <code>[MQ Demo]</code> charts and detectors (same names).</p>
+
+        <h4>Step 7 — Open the dashboard in Splunk</h4>
+        <ol class="checklist">
+          <li>Click the URL from the script output, <strong>or</strong></li>
+          <li>Splunk O11y → <strong>Dashboards</strong> → group <strong>Messaging Demo Lab</strong> → <strong>IBM MQ Ops — Messaging Demo</strong></li>
+          <li>Confirm global filter: <code>deployment.environment.name:messaging-demo-lab</code></li>
+          <li>Time range: last 15 minutes (default on dashboard)</li>
+        </ol>
+        <p><strong>What you should see:</strong></p>
+        <ul>
+          <li>Top row: depth %, oldest message age, enqueue/dequeue per min charts</li>
+          <li>Queue inventory table: one row per queue (<code>ORDER.REQ</code>, etc.) with depth, depth %, oldest msg, rates, open GET/PUT</li>
+          <li>QM overview: QM1 availability, connections, active channels, uptime, byte rates</li>
+          <li>Channel table: <code>DEV.APP.SVRCONN</code>, <code>MQOTEL.SVRCONN</code>, etc.</li>
+          <li>Bottom: MQ depth + Rabbit <code>demo.orders</code> ready count</li>
+        </ul>
+
+        <h4>Step 8 — Confirm detectors</h4>
+        <ol class="checklist">
+          <li>Splunk O11y → <strong>Alerts</strong> → <strong>Detectors</strong></li>
+          <li>Search: <code>[MQ Demo]</code></li>
+          <li>Three detectors: queue depth, oldest message age, metrics absent</li>
+          <li>Optional: open each → <strong>Alert settings</strong> → add Slack / PagerDuty / email integration</li>
+        </ol>
+
+        <h4>Step 9 — Test an alert (live demo)</h4>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-test-alert">Copy</button></div>
+          <pre><code id="cmd-test-alert"># Stop consumer and load orders — depth rises
+bash scripts/demo-incident-mq-backlog.sh
+
+# In Splunk (wait ~5 min for detector duration):
+# Alerts → Active alerts → [MQ Demo] Queue depth sustained high
+# Click alert → linked chart → APM → order-producer (PUT) vs order-consumer (no GET)
+
+# Restore
+docker compose start order-consumer</code></pre>
+        </div>
+
+        <h4>Step 10 — Customize thresholds (optional)</h4>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-provision-custom">Copy</button></div>
+          <pre><code id="cmd-provision-custom"># Depth &gt; 50 for 5m, oldest message &gt; 5 min
+python3 scripts/provision-splunk-mq-ops.py --depth-threshold 50 --age-threshold 300
+
+# Dashboard only (skip detectors)
+python3 scripts/provision-splunk-mq-ops.py --dashboard-only
+
+# Detectors only (skip dashboard)
+python3 scripts/provision-splunk-mq-ops.py --detectors-only</code></pre>
+        </div>
+
+        <h3>One-command dashboard + detectors</h3>
+        <p>Quick reference after Steps 1–6 above:</p>
+        <div class="code-block">
+          <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-provision-splunk">Copy</button></div>
+          <pre><code id="cmd-provision-splunk">docker compose restart ibm-mq-java-metrics
+python3 scripts/provision-splunk-mq-ops.py</code></pre>
+        </div>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Dashboard — IBM MQ Ops (Dynatrace-style panels)</p>
+          <p>Creates dashboard group <strong>Messaging Demo Lab</strong> → dashboard <strong>IBM MQ Ops — Messaging Demo</strong> with:</p>
+          <table class="info-table">
+            <thead><tr><th>Panel</th><th>Metrics / columns</th><th>Dynatrace equivalent</th></tr></thead>
+            <tbody>
+              <tr><td>Queue depth %</td><td><code>ibm.mq.queue.depth</code> ÷ <code>ibm.mq.max.queue.depth</code></td><td>Depth vs max depth</td></tr>
+              <tr><td>Oldest message age</td><td><code>ibm.mq.oldest.msg.age</code> (seconds)</td><td><code>ibmmq.queue.oldest_message</code></td></tr>
+              <tr><td>Enqueue / dequeue</td><td>Rates from <code>ibm.mq.message.enq.count</code> / <code>deq.count</code> (per min)</td><td>Enqueue/dequeue rates</td></tr>
+              <tr><td>Queue inventory table</td><td>Depth, depth %, oldest msg, enq/deq per min, open GET/PUT per queue</td><td>Queue list view</td></tr>
+              <tr><td>Queue manager overview</td><td>Availability, connections, active channels, uptime, bytes sent/received</td><td>QM summary</td></tr>
+              <tr><td>Channel status table</td><td>Status, bytes sent/received, message rates per channel</td><td>Channel list</td></tr>
+              <tr><td>Unified backlog</td><td>MQ depth + Rabbit ready messages</td><td>Cross-platform (Splunk differentiator)</td></tr>
+            </tbody>
+          </table>
+          <p class="muted">Global filter baked in: <code>deployment.environment.name:messaging-demo-lab</code>. Re-run the script to update charts in place (idempotent by name prefix <code>[MQ Demo]</code>).</p>
+        </div>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Detectors created by the script</p>
+          <table class="info-table">
+            <thead><tr><th>Detector</th><th>Condition (default)</th><th>Test it</th></tr></thead>
+            <tbody>
+              <tr><td><code>[MQ Demo] Queue depth sustained high</code></td><td>Depth &gt; 10 for 5m · group by queue + QM</td><td><code>demo-incident-mq-backlog.sh</code></td></tr>
+              <tr><td><code>[MQ Demo] Oldest message age SLA</code></td><td>Age &gt; 600s for 5m</td><td>Stop consumer + wait (needs MONQ on queues)</td></tr>
+              <tr><td><code>[MQ Demo] MQ metrics absent</code></td><td>No depth data 15m</td><td>Stop <code>ibm-mq-java-metrics</code> sidecar</td></tr>
+            </tbody>
+          </table>
+          <p>Customize thresholds: <code>python3 scripts/provision-splunk-mq-ops.py --depth-threshold 50 --age-threshold 300</code></p>
+          <p class="value-line"><strong>After provisioning:</strong> Alerts → Integrations → attach Slack/PagerDuty/Opsgenie to each <code>[MQ Demo]</code> detector (not included in script — org-specific).</p>
+        </div>
+
+        <div class="callout callout--troubleshoot">
+          <p class="callout__title">Presenter flow — alert → drill-down</p>
+          <ol class="show-steps">
+            <li>Run <code>provision-splunk-mq-ops.py</code> before the customer call</li>
+            <li>Open dashboard <strong>IBM MQ Ops — Messaging Demo</strong></li>
+            <li>Live: <code>demo-incident-mq-backlog.sh</code> → depth % and oldest age climb → detector fires</li>
+            <li>Click alert → metric chart → <a href="#correlation-drill">APM correlation drill</a> (producer PUT, no consumer GET)</li>
+          </ol>
+        </div>
+
+        <div class="callout callout--warning">
+          <p class="callout__title">Gotchas</p>
+          <ul>
+            <li><strong>Oldest message age</strong> requires MQ queue monitoring (<code>MONQ</code>) on target queues — empty or unmonitored queues show no data.</li>
+            <li><strong>Depth %</strong> needs <code>ibm.mq.max.queue.depth</code> — enabled in sidecar config; restart sidecar after pull.</li>
+            <li><strong>Channel table</strong> uses sidecar channel filters (<code>MQOTEL.*</code>, <code>DEV.*</code>) — production uses the same pattern with CMDB-driven include lists.</li>
+            <li><strong>Kafka lag</strong> is not on the MQ dashboard yet — add a chart in UI after confirming exact <code>kafka.consumer</code> metric names from your cluster.</li>
+          </ul>
+        </div>
       </section>
 
       <section id="splunk-views">
@@ -650,7 +942,8 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
             <tr><td>Kafka</td><td>Search <code>kafka.broker</code>, <code>kafka.consumer</code>, <code>kafka.topic</code> (kafkametrics names)</td><td>After <code>load-kafka-traffic.sh</code>; scrape every 30s</td></tr>
             <tr><td>MQ APM — producer</td><td>Service <code>order-producer</code> · span <code>mq.put.order</code></td><td>Confirm upstream still publishing</td></tr>
             <tr><td>MQ APM — consumer</td><td>Service <code>order-consumer</code> · span <code>mq.get.order</code></td><td>Confirm downstream consuming; absence = app issue</td></tr>
-            <tr><td>Trace by business ID</td><td>APM Traces · tag <code>correlation.id</code> or search correlation header value</td><td>“Order X failed” — find exact path</td></tr>
+            <tr><td>Trace by business ID</td><td>APM Traces · search <code>CORR_ID</code> text · span attr <code>order.id</code> on <code>inventory.fulfill</code></td><td>“Order X failed” — find exact path (<a href="#correlation-drill">drill</a>)</td></tr>
+            <tr><td>Correlation drill</td><td><a href="#correlation-drill">Metric → APM → business ID</a> · same tenant for Kafka/Rabbit</td><td>Live demo script for Demo 2 + 3 together</td></tr>
           </tbody>
         </table>
       </section>
@@ -678,12 +971,19 @@ echo "Correlation ID: ${CORR_ID}"</code></pre>
             <thead><tr><th>Metric</th><th>What it measures</th><th>Key dimensions</th><th>When it matters</th></tr></thead>
             <tbody>
               <tr><td><code>ibm.mq.queue.depth</code></td><td>Current message count on a queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>Backlog incidents — sustained rise = consumer down or too slow</td></tr>
+              <tr><td><code>ibm.mq.max.queue.depth</code></td><td>Configured maximum depth for the queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>With depth → <strong>depth %</strong> for capacity alerts</td></tr>
+              <tr><td><code>ibm.mq.oldest.msg.age</code></td><td>Age in seconds of the oldest message on the queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>SLA / stuck-message alerts (Dynatrace <code>ibmmq.queue.oldest_message</code>); requires <code>MONQ</code></td></tr>
               <tr><td><code>ibm.mq.message.enq.count</code></td><td>Messages put (enqueued) on the queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>Confirm producers still sending</td></tr>
               <tr><td><code>ibm.mq.message.deq.count</code></td><td>Messages got (dequeued) from the queue</td><td><code>queue</code>, <code>queue_manager</code></td><td>Confirm consumers still reading; enqueue &gt;&gt; dequeue → depth grows</td></tr>
               <tr><td><code>ibm.mq.manager.status</code></td><td>Queue manager health</td><td><code>queue_manager</code></td><td>QM down = all queues on that QM affected</td></tr>
               <tr><td><code>ibm.mq.connection.count</code></td><td>Active client connections</td><td><code>queue_manager</code></td><td>Unexpected drop may indicate app or network issue</td></tr>
               <tr><td><code>ibm.mq.open.input.count</code> / <code>open.output.count</code></td><td>Apps with queue open for GET / PUT</td><td><code>queue</code></td><td>Zero input opens with rising depth → no consumer</td></tr>
               <tr><td><code>ibm.mq.heartbeat</code></td><td>Sidecar successfully scraped QM</td><td><code>queue_manager</code></td><td>Flatlines if sidecar or MQ client path failed</td></tr>
+              <tr><td><code>ibm.mq.manager.status</code></td><td>Queue manager availability (1 = up)</td><td><code>queue_manager</code></td><td>QM-down incidents</td></tr>
+              <tr><td><code>ibm.mq.manager.active.channels</code></td><td>Active channel instances</td><td><code>queue_manager</code></td><td>Channel capacity / connectivity</td></tr>
+              <tr><td><code>ibm.mq.queue_manager.uptime</code></td><td>Seconds since QM started</td><td><code>queue_manager</code></td><td>Recent restarts vs chronic issues</td></tr>
+              <tr><td><code>ibm.mq.byte.sent</code> / <code>byte.received</code></td><td>Channel byte throughput</td><td><code>ibm.mq.channel.name</code></td><td>Traffic anomalies on app channels</td></tr>
+              <tr><td><code>ibm.mq.status</code></td><td>Channel status code</td><td><code>ibm.mq.channel.name</code></td><td>Channel-not-active vs app issue</td></tr>
             </tbody>
           </table>
           <p class="muted">Source: OpenTelemetry Java Contrib <code>ibm-mq-metrics</code> sidecar → OTLP → collector. APM spans: <code>mq.put.order</code>, <code>mq.get.order</code> on services <code>order-producer</code> / <code>order-consumer</code>.</p>
@@ -859,6 +1159,14 @@ docker compose logs otel-collector --tail 20</code></pre>
           <li><strong>APM</strong> → services <code>order-producer</code>, <code>order-consumer</code>, <code>inventory-service</code></li>
         </ol>
 
+        <h3>API token — dashboards &amp; detectors (optional)</h3>
+        <p>To run <code>scripts/provision-splunk-mq-ops.py</code>, add a separate <strong>API</strong> token to <code>.env.splunk</code>:</p>
+        <ol class="checklist">
+          <li>Settings → Access Tokens → New Token → type: <strong>API</strong> (admin or power role)</li>
+          <li><code>SPLUNK_API_TOKEN=...</code> in <code>.env.splunk</code></li>
+          <li><code>python3 scripts/provision-splunk-mq-ops.py</code> — see <a href="#splunk-setup">Splunk setup</a></li>
+        </ol>
+
         <div class="callout callout--warning">
           <p class="callout__title">Do not commit .env.splunk</p>
           <p>Only <code>.env.splunk.example</code> (placeholder values) belongs in git. If you accidentally commit a token, revoke it in Splunk and create a new one.</p>
@@ -878,6 +1186,7 @@ docker compose logs otel-collector --tail 20</code></pre>
 cd MQ-Rabbit-Kafka
 cp .env.splunk.example .env.splunk
 # Edit .env.splunk — paste SPLUNK_ACCESS_TOKEN (see Splunk token section)
+python3 scripts/provision-splunk-mq-ops.py   # optional: MQ ops dashboard + detectors
 bash scripts/run-demo.sh</code></pre>
             </div>
             <p>Full token setup: <a href="#splunk-token">Splunk access token</a> · Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>

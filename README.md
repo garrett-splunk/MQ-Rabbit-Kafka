@@ -59,7 +59,27 @@ See [demo guide — Platform UIs](https://garrett-splunk.github.io/MQ-Rabbit-Kaf
 
 See [demo guide — OTelBin configs](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#otelbin-examples) for interactive collector YAML (Splunk agent, RabbitMQ, Kafka, IBM MQ).
 
+## Splunk MQ ops dashboard (provision script)
+
+Dynatrace ships MQ dashboards and alerts with the extension; Splunk needs a one-time setup. After ingest works:
+
+1. **Ingest token** in `.env.splunk` as `SPLUNK_ACCESS_TOKEN` (see demo guide).
+2. **API token** — Splunk O11y → Settings → Access Tokens → **API** (admin/power) → add as `SPLUNK_API_TOKEN` in `.env.splunk`.
+3. **Restart sidecar** — `docker compose restart ibm-mq-java-metrics`
+4. **Provision** — `python3 scripts/provision-splunk-mq-ops.py`
+5. **Open dashboard** — Splunk → Dashboards → **Messaging Demo Lab** → **IBM MQ Ops — Messaging Demo** (or use URL printed by script).
+6. **Test alert** — `bash scripts/demo-incident-mq-backlog.sh` → wait ~5m → Alerts → `[MQ Demo] Queue depth sustained high`.
+
+Full click-path: [demo guide — Splunk setup](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#splunk-setup).
+
+```bash
+python3 scripts/provision-splunk-mq-ops.py --dry-run          # preview only
+python3 scripts/provision-splunk-mq-ops.py --depth-threshold 50  # custom thresholds
+```
+
 See [demo guide — Splunk token](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#splunk-token) for full steps.
+
+See [demo guide — Splunk setup (dashboards & alerting)](https://garrett-splunk.github.io/MQ-Rabbit-Kafka/#splunk-setup) to provision an IBM MQ ops dashboard and detectors via script.
 
 Or step by step:
 
@@ -86,6 +106,7 @@ load-messaging-demo                         # global command (from any directory
 load-messaging-demo --mq 20 --kafka 30      # custom counts
 bash scripts/load-traffic.sh 10 200              # MQ orders only
 bash scripts/demo-incident-mq-backlog.sh         # stop consumer → depth alert story
+python3 scripts/provision-splunk-mq-ops.py       # Splunk MQ ops dashboard + detectors (needs SPLUNK_API_TOKEN)
 bash scripts/load-kafka-traffic.sh demo.orders 15
 bash scripts/load-rabbit-traffic.sh 10           # curl + management API (no pika)
 ```
