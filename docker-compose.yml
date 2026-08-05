@@ -86,6 +86,12 @@ services:
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./collector/otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+    # Docker Desktop's embedded DNS (127.0.0.11) occasionally fails to resolve
+    # ingest.us1.signalfx.com — that drops all metric exports while traces may
+    # still flow on retry. Use public resolvers for reliable Splunk ingest.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     env_file:
       - .env
       - path: .env.splunk
@@ -123,6 +129,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
       OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${DEPLOYMENT_ENVIRONMENT:-messaging-demo-lab},deployment.environment=${DEPLOYMENT_ENVIRONMENT:-messaging-demo-lab},service.name=ibm-mq-java-metrics,service.namespace=mq-rabbit-kafka-demo
       SCRAPE_INTERVAL_SECONDS: "15"
     restart: unless-stopped
 

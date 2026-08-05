@@ -6,6 +6,7 @@ USER root
 COPY mq/mqtracingexit.conf /etc/mqm/mqtracingexit.conf
 COPY mq/10-dev.mqsc /opt/mqm/lab/10-dev.mqsc
 COPY mq/20-lab-connect.mqsc /opt/mqm/lab/20-lab-connect.mqsc
+COPY mq/30-lab-monitor.mqsc /opt/mqm/lab/30-lab-monitor.mqsc
 COPY mq/install-tracing-config.sh /usr/local/bin/install-tracing-config.sh
 COPY mq/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 755 /usr/local/bin/install-tracing-config.sh /usr/local/bin/docker-entrypoint.sh \

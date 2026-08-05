@@ -20,8 +20,9 @@ queueManagers:
         - type: "STARTSWITH"
           values: ["SYSTEM", "AMQ"]
 
+# Sidecar channel filters — match app + metrics SVRCONN only (avoids 3065 on unused DEV.* channels).
     channelFilters:
-      include: ["MQOTEL.*", "DEV.*"]
+      include: ["MQOTEL.*", "DEV.APP.SVRCONN"]
       exclude:
         - type: "STARTSWITH"
           values: ["SYSTEM"]
@@ -68,8 +69,6 @@ metrics:
   "ibm.mq.byte.sent":
     enabled: true
   "ibm.mq.byte.received":
-    enabled: true
-  "ibm.mq.status":
     enabled: true
   "ibm.mq.message.sent.count":
     enabled: true

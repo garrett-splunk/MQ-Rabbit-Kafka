@@ -1,0 +1,10 @@
+* Queue monitoring for Splunk / OTel sidecar metrics (idempotent — safe on every QM start).
+* Oldest message age (ibm.mq.oldest.msg.age) requires MONQ on each queue — see IBM MQ DISPLAY QSTATUS.
+
+ALTER QLOCAL(ORDER.REQ) MONQ(LOW)
+ALTER QLOCAL(ORDER.RESP) MONQ(LOW)
+
+* Developer sample queues (when present from MQ_DEV defaults)
+ALTER QLOCAL(DEV.QUEUE.1) MONQ(LOW)
+ALTER QLOCAL(DEV.QUEUE.2) MONQ(LOW)
+ALTER QLOCAL(DEV.QUEUE.3) MONQ(LOW)

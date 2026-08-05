@@ -6,7 +6,7 @@ apply_lab_mqsc() {
   attempt=0
   while [ "$attempt" -lt 90 ]; do
     if chkmqready 2>/dev/null; then
-      for mqsc in /opt/mqm/lab/20-lab-connect.mqsc /opt/mqm/lab/10-dev.mqsc; do
+      for mqsc in /opt/mqm/lab/20-lab-connect.mqsc /opt/mqm/lab/10-dev.mqsc /opt/mqm/lab/30-lab-monitor.mqsc; do
         if [ -f "$mqsc" ]; then
           echo "Applying ${mqsc}..."
           runmqsc "${MQ_QMGR_NAME:-QM1}" < "$mqsc" || true

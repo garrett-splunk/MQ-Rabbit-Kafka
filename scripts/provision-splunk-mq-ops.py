@@ -22,12 +22,29 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 TAG = "mq-rabbit-kafka-demo"
 PREFIX = "[MQ Demo]"
 ENV_DEFAULT = "messaging-demo-lab"
+# Java Contrib sidecar scrape interval (seconds) — must match SCRAPE_INTERVAL_SECONDS in compose.
+MQ_SCRAPE_INTERVAL_SECONDS = 15
+# RESET_Q_STATS exports counts since the prior scrape; scale to per-minute (not rate()).
+ENQ_DEQ_PER_MIN_SCALE = 60 / MQ_SCRAPE_INTERVAL_SECONDS
+# Table charts use 5m means so presenters see stable numbers, not empty 15s snapshots.
+TABLE_WINDOW = "5m"
+
+
+@dataclass(frozen=True)
+class ChartDef:
+    name: str
+    program: str
+    chart_type: str
+    description: str
+    group_by: list[str] | None = None
+    sort_by: str | None = None
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -59,8 +76,8 @@ def env_line(env: str) -> str:
 
 
 def queue_group_dims() -> str:
-    # OTel sidecar may emit queue or messaging.destination.name; group by both.
-    return "['queue', 'messaging.destination.name', 'queue_manager', 'ibm.mq.queue.manager']"
+    # Java Contrib ibm-mq-metrics uses OTel semconv (not legacy "queue" / "queue_manager").
+    return "['messaging.destination.name', 'ibm.mq.queue.manager', 'ibm.mq.queue.type']"
 
 
 class SplunkO11yClient:
@@ -100,7 +117,9 @@ class SplunkO11yClient:
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"{method} {url} failed ({exc.code}): {detail}") from exc
+            raise RuntimeError(
+                f"{method} {url} failed ({exc.code}): {detail[:4000]}"
+            ) from exc
 
     def find_by_name(self, resource: str, name: str) -> dict[str, Any] | None:
         if self.dry_run:
@@ -111,7 +130,15 @@ class SplunkO11yClient:
                 return item
         return None
 
-    def upsert_chart(self, name: str, program_text: str, chart_type: str, description: str) -> str:
+    def upsert_chart(
+        self,
+        name: str,
+        program_text: str,
+        chart_type: str,
+        description: str,
+        group_by: list[str] | None = None,
+        sort_by: str | None = None,
+    ) -> str:
         existing = self.find_by_name("chart", name)
         body = {
             "name": name,
@@ -128,10 +155,11 @@ class SplunkO11yClient:
         opts = body["options"]
         if opts.get("defaultPlotType") is None:
             del opts["defaultPlotType"]
-        if chart_type == "TableChart":
-            opts["groupBy"] = ["queue", "messaging.destination.name", "queue_manager", "ibm.mq.queue.manager"]
-            opts["sortBy"] = "Depth"
-            opts["sortDirection"] = "Descending"
+        if chart_type == "TableChart" and group_by:
+            opts["groupBy"] = group_by
+            if sort_by:
+                opts["sortBy"] = sort_by
+                opts["sortDirection"] = "Descending"
         if existing:
             chart_id = existing["id"]
             print(f"Updating chart: {name} ({chart_id})")
@@ -148,8 +176,39 @@ class SplunkO11yClient:
             print(f"Using dashboard group: {name} ({existing['id']})")
             return existing["id"]
         print(f"Creating dashboard group: {name}")
-        created = self._request("POST", "/dashboardgroup", body={"name": name, "tags": [TAG]})
+        created = self._request(
+            "POST",
+            "/dashboardgroup",
+            body={
+                "name": name,
+                "description": "IBM MQ / messaging demo dashboards (provisioned by provision-splunk-mq-ops.py).",
+            },
+        )
         return created["id"]
+
+    def dashboard_filters(self, env: str) -> dict[str, Any]:
+        """Dashboard filter object shape expected by POST/PUT /v2/dashboard."""
+        return {
+            "sources": [],
+            "time": {"end": "Now", "start": "-15m"},
+            "variables": [
+                {
+                    "alias": "Environment",
+                    "applyIfExists": False,
+                    "description": "Deployment environment for the messaging demo lab",
+                    "preferredSuggestions": [env],
+                    "property": "deployment.environment.name",
+                    "propertyMappings": [
+                        "deployment.environment.name",
+                        "deployment.environment",
+                    ],
+                    "replaceOnly": False,
+                    "required": True,
+                    "restricted": False,
+                    "value": [env],
+                }
+            ],
+        }
 
     def upsert_dashboard(
         self,
@@ -163,18 +222,9 @@ class SplunkO11yClient:
             "name": name,
             "description": "IBM MQ operations view — mirrors Dynatrace MQ extension queue/QM panels for the messaging demo lab.",
             "tags": [TAG, "ibm-mq"],
-            "dashboardGroupId": group_id,
+            "groupId": group_id,
             "charts": charts,
-            "filters": [
-                {
-                    "property": "deployment.environment.name",
-                    "values": [env],
-                    "preferredSuggestions": [env],
-                    "required": True,
-                    "restricted": False,
-                }
-            ],
-            "timeRange": "-15m",
+            "filters": self.dashboard_filters(env),
         }
         if existing:
             dash_id = existing["id"]
@@ -220,9 +270,12 @@ class SplunkO11yClient:
         return created["id"]
 
 
-def build_charts(env: str) -> list[tuple[str, str, str, str]]:
+def build_charts(env: str) -> list[ChartDef]:
     el = env_line(env)
     gq = queue_group_dims()
+    tw = TABLE_WINDOW
+    enq = f"data('ibm.mq.message.enq.count', filter=env_filter).mean(over='{tw}').sum(by="
+    deq = f"data('ibm.mq.message.deq.count', filter=env_filter).mean(over='{tw}').sum(by="
 
     depth_pct = f"""
 {el}
@@ -238,63 +291,109 @@ data('ibm.mq.oldest.msg.age', filter=env_filter).sum(by={gq}).publish(label='Old
 
     enq_deq = f"""
 {el}
-data('ibm.mq.message.enq.count', filter=env_filter).rate().scale(60).sum(by={gq}).publish(label='Enqueue/min')
-data('ibm.mq.message.deq.count', filter=env_filter).rate().scale(60).sum(by={gq}).publish(label='Dequeue/min')
+{enq}{gq}).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Enqueue/min')
+{deq}{gq}).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Dequeue/min')
 """.strip()
 
     queue_table = f"""
 {el}
-data('ibm.mq.queue.depth', filter=env_filter).sum(by={gq}).publish(label='Depth')
-data('ibm.mq.max.queue.depth', filter=env_filter).sum(by={gq}).publish(label='Max Depth')
-data('ibm.mq.oldest.msg.age', filter=env_filter).sum(by={gq}).publish(label='Oldest Msg (s)')
-data('ibm.mq.message.enq.count', filter=env_filter).rate().scale(60).sum(by={gq}).publish(label='Enqueue/min')
-data('ibm.mq.message.deq.count', filter=env_filter).rate().scale(60).sum(by={gq}).publish(label='Dequeue/min')
-data('ibm.mq.open.input.count', filter=env_filter).sum(by={gq}).publish(label='Open GET')
-data('ibm.mq.open.output.count', filter=env_filter).sum(by={gq}).publish(label='Open PUT')
-((data('ibm.mq.queue.depth', filter=env_filter).sum(by={gq}) / data('ibm.mq.max.queue.depth', filter=env_filter).sum(by={gq})) * 100).publish(label='Depth %')
+gq = {gq}
+depth = data('ibm.mq.queue.depth', filter=env_filter).mean(over='{tw}').sum(by=gq).publish(label='Depth')
+max_d = data('ibm.mq.max.queue.depth', filter=env_filter).mean(over='{tw}').sum(by=gq).publish(label='Max Depth')
+((depth / max_d) * 100).publish(label='Depth %')
+data('ibm.mq.oldest.msg.age', filter=env_filter).mean(over='{tw}').sum(by=gq).publish(label='Oldest Msg (s)')
+enq_r = data('ibm.mq.message.enq.count', filter=env_filter).mean(over='{tw}').sum(by=gq).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Enqueue/min')
+deq_r = data('ibm.mq.message.deq.count', filter=env_filter).mean(over='{tw}').sum(by=gq).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Dequeue/min')
+(enq_r - deq_r).publish(label='Net flow/min')
 """.strip()
 
     qm_table = f"""
 {el}
-gm = ['queue_manager', 'ibm.mq.queue.manager']
-data('ibm.mq.manager.status', filter=env_filter).sum(by=gm).publish(label='QM Available')
-data('ibm.mq.connection.count', filter=env_filter).sum(by=gm).publish(label='Connections')
-data('ibm.mq.manager.active.channels', filter=env_filter).sum(by=gm).publish(label='Active Channels')
-data('ibm.mq.queue_manager.uptime', filter=env_filter).sum(by=gm).publish(label='Uptime (s)')
-data('ibm.mq.byte.sent', filter=env_filter).rate().sum(by=gm).publish(label='Bytes Sent/s')
-data('ibm.mq.byte.received', filter=env_filter).rate().sum(by=gm).publish(label='Bytes Received/s')
+gm = ['ibm.mq.queue.manager']
+data('ibm.mq.manager.status', filter=env_filter).mean(over='{tw}').sum(by=gm).publish(label='QM Status')
+data('ibm.mq.connection.count', filter=env_filter).mean(over='{tw}').sum(by=gm).publish(label='Connections')
+data('ibm.mq.manager.active.channels', filter=env_filter).mean(over='{tw}').sum(by=gm).publish(label='Active Channels')
+data('ibm.mq.queue_manager.uptime', filter=env_filter).mean(over='{tw}').sum(by=gm).publish(label='Uptime (s)')
+data('ibm.mq.byte.sent', filter=env_filter).rate().mean(over='{tw}').sum(by=gm).publish(label='Bytes Sent/s')
+data('ibm.mq.byte.received', filter=env_filter).rate().mean(over='{tw}').sum(by=gm).publish(label='Bytes Received/s')
 """.strip()
 
     channel_table = f"""
 {el}
-gc = ['ibm.mq.channel.name', 'ibm.mq.channel.type', 'queue_manager', 'ibm.mq.queue.manager']
-data('ibm.mq.status', filter=env_filter).sum(by=gc).publish(label='Channel Status')
-data('ibm.mq.byte.sent', filter=env_filter).rate().sum(by=gc).publish(label='Bytes Sent/s')
-data('ibm.mq.byte.received', filter=env_filter).rate().sum(by=gc).publish(label='Bytes Received/s')
-data('ibm.mq.message.sent.count', filter=env_filter).rate().scale(60).sum(by=gc).publish(label='Msgs Sent/min')
-data('ibm.mq.message.received.count', filter=env_filter).rate().scale(60).sum(by=gc).publish(label='Msgs Recv/min')
+gc = ['ibm.mq.channel.name', 'ibm.mq.channel.type', 'ibm.mq.queue.manager']
+ch = env_filter and filter('ibm.mq.channel.name', 'MQOTEL.SVRCONN', 'DEV.APP.SVRCONN')
+data('ibm.mq.status', filter=ch).mean(over='{tw}').sum(by=gc).publish(label='Channel Status')
+data('ibm.mq.byte.sent', filter=ch).rate().mean(over='{tw}').sum(by=gc).publish(label='Bytes Sent/s')
+data('ibm.mq.byte.received', filter=ch).rate().mean(over='{tw}').sum(by=gc).publish(label='Bytes Received/s')
+data('ibm.mq.message.sent.count', filter=ch).rate().mean(over='{tw}').scale(60).sum(by=gc).publish(label='Msgs Sent/min')
+data('ibm.mq.message.received.count', filter=ch).rate().mean(over='{tw}').scale(60).sum(by=gc).publish(label='Msgs Recv/min')
 """.strip()
 
     unified = f"""
 {el}
-data('ibm.mq.queue.depth', filter=env_filter).sum(by=['queue', 'messaging.destination.name']).publish(label='MQ depth')
+data('ibm.mq.queue.depth', filter=env_filter).sum(by=['messaging.destination.name', 'ibm.mq.queue.manager']).publish(label='MQ depth')
 data('rabbitmq.message.current', filter=env_filter and filter('message.state', 'ready')).sum(by=['rabbitmq.queue.name']).publish(label='Rabbit ready')
 """.strip()
 
+    queue_dims = ["messaging.destination.name", "ibm.mq.queue.manager", "ibm.mq.queue.type"]
+    qm_dims = ["ibm.mq.queue.manager"]
+    ch_dims = ["ibm.mq.channel.name", "ibm.mq.channel.type", "ibm.mq.queue.manager"]
+
     return [
-        (f"{PREFIX} Queue depth %", depth_pct, "TimeSeriesChart", "Queue depth as % of max depth (Dynatrace CURDEPTH / MAXDEPTH)."),
-        (f"{PREFIX} Oldest message age", oldest_age, "TimeSeriesChart", "Age in seconds of the oldest message on each queue (Dynatrace ibmmq.queue.oldest_message)."),
-        (f"{PREFIX} Enqueue / Dequeue per min", enq_deq, "TimeSeriesChart", "Message enqueue and dequeue rates per queue."),
-        (f"{PREFIX} Queue inventory", queue_table, "TableChart", "Per-queue depth, depth %, oldest message, rates, and open GET/PUT handles."),
-        (f"{PREFIX} Queue manager overview", qm_table, "TableChart", "QM availability, connections, active channels, uptime, byte rates."),
-        (f"{PREFIX} Channel status", channel_table, "TableChart", "Per-channel status, byte rates, and message rates."),
-        (f"{PREFIX} Unified messaging backlog", unified, "TimeSeriesChart", "MQ depth + Rabbit ready messages in one chart (Kafka lag: add after confirming metric names)."),
+        ChartDef(
+            f"{PREFIX} Queue depth %",
+            depth_pct,
+            "TimeSeriesChart",
+            "Queue depth as % of max depth (Dynatrace CURDEPTH / MAXDEPTH).",
+        ),
+        ChartDef(
+            f"{PREFIX} Oldest message age",
+            oldest_age,
+            "TimeSeriesChart",
+            "Age in seconds of the oldest message on each queue (Dynatrace ibmmq.queue.oldest_message).",
+        ),
+        ChartDef(
+            f"{PREFIX} Enqueue / Dequeue per min",
+            enq_deq,
+            "TimeSeriesChart",
+            "Message enqueue and dequeue rates per queue.",
+        ),
+        ChartDef(
+            f"{PREFIX} Queue inventory",
+            queue_table,
+            "TableChart",
+            "Per-queue depth, depth %, oldest message, throughput, and net backlog rate (5m avg).",
+            group_by=queue_dims,
+            sort_by="Depth",
+        ),
+        ChartDef(
+            f"{PREFIX} Queue manager overview",
+            qm_table,
+            "TableChart",
+            "One row per QM: status, connections, active channels, uptime, aggregate byte rates.",
+            group_by=qm_dims,
+            sort_by="Connections",
+        ),
+        ChartDef(
+            f"{PREFIX} Channel status",
+            channel_table,
+            "TableChart",
+            "App + metrics SVRCONN channels: status, byte rates, message rates (5m avg).",
+            group_by=ch_dims,
+            sort_by="Bytes Sent/s",
+        ),
+        ChartDef(
+            f"{PREFIX} Unified messaging backlog",
+            unified,
+            "TimeSeriesChart",
+            "MQ depth + Rabbit ready messages in one chart (Kafka lag: add after confirming metric names).",
+        ),
     ]
 
 
 def build_detectors(env: str, depth_threshold: int, age_threshold: int) -> list[tuple[str, str, str, str, str]]:
     el = env_line(env)
-    gq = "['queue', 'messaging.destination.name', 'queue_manager', 'ibm.mq.queue.manager']"
+    gq = "['messaging.destination.name', 'ibm.mq.queue.manager', 'ibm.mq.queue.type']"
 
     depth_det = f"""
 {el}
@@ -341,6 +440,7 @@ detect(when(depth is None, lasting='15m')).publish('MQ metrics absent')
 
 def layout_charts(chart_ids: list[str]) -> list[dict[str, Any]]:
     """12-column grid layout matching a typical Dynatrace MQ overview."""
+    # (column, row, width, height)
     specs = [
         (0, 0, 4, 2),
         (4, 0, 4, 2),
@@ -351,8 +451,10 @@ def layout_charts(chart_ids: list[str]) -> list[dict[str, Any]]:
         (0, 8, 12, 2),
     ]
     charts: list[dict[str, Any]] = []
-    for chart_id, (x, y, w, h) in zip(chart_ids, specs, strict=False):
-        charts.append({"chartId": chart_id, "x": x, "y": y, "width": w, "height": h})
+    for chart_id, (column, row, width, height) in zip(chart_ids, specs, strict=False):
+        charts.append(
+            {"chartId": chart_id, "column": column, "row": row, "width": width, "height": height}
+        )
     return charts
 
 
@@ -395,8 +497,17 @@ def main() -> int:
     if not args.detectors_only:
         chart_defs = build_charts(args.env)
         chart_ids: list[str] = []
-        for name, program, ctype, desc in chart_defs:
-            chart_ids.append(client.upsert_chart(name, program, ctype, desc))
+        for chart in chart_defs:
+            chart_ids.append(
+                client.upsert_chart(
+                    chart.name,
+                    chart.program,
+                    chart.chart_type,
+                    chart.description,
+                    group_by=chart.group_by,
+                    sort_by=chart.sort_by,
+                )
+            )
 
         group_id = client.ensure_dashboard_group(args.group_name)
         dashboard_id = client.upsert_dashboard(
@@ -419,8 +530,8 @@ def main() -> int:
         print("\nDetectors created/updated. Attach notification integrations in Splunk UI if needed.")
 
     print("\nNext steps:")
-    print("  1. docker compose restart ibm-mq-java-metrics   # pick up new sidecar metrics")
-    print("  2. load-messaging-demo                          # generate traffic")
+    print("  1. docker compose build ibm-mq-java-metrics && docker compose up -d --force-recreate ibm-mq-java-metrics")
+    print("  2. bash scripts/warm-mq-dashboard.sh              # fill table columns before the demo")
     print("  3. Alerts → Detectors → link Slack/PagerDuty on [MQ Demo] detectors")
     return 0
 

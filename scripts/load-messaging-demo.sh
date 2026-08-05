@@ -18,11 +18,11 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
-MQ_COUNT=10
-MQ_DELAY_MS=200
+MQ_COUNT=25
+MQ_DELAY_MS=150
 KAFKA_TOPIC=demo.orders
-KAFKA_COUNT=15
-RABBIT_COUNT=10
+KAFKA_COUNT=30
+RABBIT_COUNT=20
 DO_MQ=true
 DO_KAFKA=true
 DO_RABBIT=true
@@ -35,11 +35,11 @@ Usage: load-messaging-demo [OPTIONS]
 Generate demo traffic for the MQ-Rabbit-Kafka lab (Splunk metrics + APM).
 
 Options:
-  --mq N           MQ orders to send (default: 10)
+  --mq N           MQ orders to send (default: 25)
   --mq-delay MS    Delay between MQ orders in ms (default: 200)
-  --kafka N        Kafka messages to produce (default: 15)
+  --kafka N        Kafka messages to produce (default: 30)
   --kafka-topic T  Kafka topic (default: demo.orders)
-  --rabbit N       RabbitMQ messages to publish (default: 10)
+  --rabbit N       RabbitMQ messages to publish (default: 20)
   --mq-only        Load MQ traffic only
   --kafka-only     Load Kafka traffic only
   --rabbit-only    Load RabbitMQ traffic only
@@ -120,6 +120,7 @@ fi
 
 echo "== Done =="
 echo "  Splunk filter: deployment.environment.name:messaging-demo-lab"
-echo "  MQ metric:     ibm.mq.queue.depth (queue=ORDER.REQ)"
+echo "  MQ metric:     ibm.mq.queue.depth (messaging.destination.name=ORDER.REQ)"
 echo "  Rabbit metric: rabbitmq.message.current (message.state=ready)"
 echo "  Kafka metrics: kafka.broker.* / kafka.consumer.* (~30s scrape)"
+echo "  Heavier load:  load-messaging-demo --mq 50 --kafka 50 --rabbit 30"
