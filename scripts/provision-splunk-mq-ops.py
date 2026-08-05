@@ -33,8 +33,9 @@ ENV_DEFAULT = "messaging-demo-lab"
 MQ_SCRAPE_INTERVAL_SECONDS = 15
 # RESET_Q_STATS exports counts since the prior scrape; scale to per-minute (not rate()).
 ENQ_DEQ_PER_MIN_SCALE = 60 / MQ_SCRAPE_INTERVAL_SECONDS
-# Table charts use 5m means so presenters see stable numbers, not empty 15s snapshots.
+# Table charts use 5m window — sum interval counts then scale to per-minute average.
 TABLE_WINDOW = "5m"
+PER_MIN_FROM_SUM = 1 / 5  # total in 5m → avg per minute
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,22 @@ def env_line(env: str) -> str:
 def queue_group_dims() -> str:
     # Java Contrib ibm-mq-metrics uses OTel semconv (not legacy "queue" / "queue_manager").
     return "['messaging.destination.name', 'ibm.mq.queue.manager', 'ibm.mq.queue.type']"
+
+
+def throughput_per_min(metric: str, group_by: str, label: str) -> str:
+    """RESET_Q_STATS interval counts — sum over table window, scale to /min."""
+    return (
+        f"data('{metric}', filter=env_filter).sum(over='{TABLE_WINDOW}')"
+        f".sum(by={group_by}).scale({PER_MIN_FROM_SUM}).publish(label='{label}')"
+    )
+
+
+def gauge_mean_sum(metric: str, group_by: str, label: str, filt: str = "env_filter") -> str:
+    """Cumulative channel/QM gauges (byte.*) — rate() breaks when sidecar reconnects every scrape."""
+    return (
+        f"data('{metric}', filter={filt}).mean(over='{TABLE_WINDOW}')"
+        f".sum(by={group_by}).publish(label='{label}')"
+    )
 
 
 def oldest_age_clamped(group_by: str, label: str, window: str | None = None) -> str:
@@ -309,8 +326,8 @@ depth = data('ibm.mq.queue.depth', filter=env_filter).mean(over='{tw}').sum(by=g
 max_d = data('ibm.mq.max.queue.depth', filter=env_filter).mean(over='{tw}').sum(by=gq).publish(label='Max Depth')
 ((depth / max_d) * 100).publish(label='Depth %')
 {oldest_age_clamped("gq", "Oldest Msg (s)", tw)}
-enq_r = data('ibm.mq.message.enq.count', filter=env_filter).mean(over='{tw}').sum(by=gq).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Enqueue/min')
-deq_r = data('ibm.mq.message.deq.count', filter=env_filter).mean(over='{tw}').sum(by=gq).scale({ENQ_DEQ_PER_MIN_SCALE}).publish(label='Dequeue/min')
+enq_r = data('ibm.mq.message.enq.count', filter=env_filter).sum(over='{tw}').sum(by=gq).scale({PER_MIN_FROM_SUM}).publish(label='Enqueue/min')
+deq_r = data('ibm.mq.message.deq.count', filter=env_filter).sum(over='{tw}').sum(by=gq).scale({PER_MIN_FROM_SUM}).publish(label='Dequeue/min')
 (enq_r - deq_r).publish(label='Net flow/min')
 """.strip()
 
@@ -321,19 +338,16 @@ data('ibm.mq.manager.status', filter=env_filter).mean(over='{tw}').sum(by=gm).pu
 data('ibm.mq.connection.count', filter=env_filter).mean(over='{tw}').sum(by=gm).publish(label='Connections')
 data('ibm.mq.manager.active.channels', filter=env_filter).mean(over='{tw}').sum(by=gm).publish(label='Active Channels')
 data('ibm.mq.queue_manager.uptime', filter=env_filter).mean(over='{tw}').sum(by=gm).publish(label='Uptime (s)')
-data('ibm.mq.byte.sent', filter=env_filter).rate().mean(over='{tw}').sum(by=gm).publish(label='Bytes Sent/s')
-data('ibm.mq.byte.received', filter=env_filter).rate().mean(over='{tw}').sum(by=gm).publish(label='Bytes Received/s')
+{gauge_mean_sum("ibm.mq.byte.sent", "gm", "Bytes Sent")}
+{gauge_mean_sum("ibm.mq.byte.received", "gm", "Bytes Received")}
 """.strip()
 
     channel_table = f"""
 {el}
 gc = ['ibm.mq.channel.name', 'ibm.mq.channel.type', 'ibm.mq.queue.manager']
-ch = env_filter and filter('ibm.mq.channel.name', 'MQOTEL.SVRCONN', 'DEV.APP.SVRCONN')
-data('ibm.mq.status', filter=ch).mean(over='{tw}').sum(by=gc).publish(label='Channel Status')
-data('ibm.mq.byte.sent', filter=ch).rate().mean(over='{tw}').sum(by=gc).publish(label='Bytes Sent/s')
-data('ibm.mq.byte.received', filter=ch).rate().mean(over='{tw}').sum(by=gc).publish(label='Bytes Received/s')
-data('ibm.mq.message.sent.count', filter=ch).rate().mean(over='{tw}').scale(60).sum(by=gc).publish(label='Msgs Sent/min')
-data('ibm.mq.message.received.count', filter=ch).rate().mean(over='{tw}').scale(60).sum(by=gc).publish(label='Msgs Recv/min')
+data('ibm.mq.status', filter=env_filter).mean(over='{tw}').sum(by=gc).publish(label='Channel Status')
+{gauge_mean_sum("ibm.mq.byte.sent", "gc", "Bytes Sent")}
+{gauge_mean_sum("ibm.mq.byte.received", "gc", "Bytes Received")}
 """.strip()
 
     unified = f"""
@@ -385,9 +399,9 @@ data('rabbitmq.message.current', filter=env_filter and filter('message.state', '
             f"{PREFIX} Channel status",
             channel_table,
             "TableChart",
-            "App + metrics SVRCONN channels: status, byte rates, message rates (5m avg).",
+            "App + metrics SVRCONN channels: status and byte totals (5m avg; sidecar reconnects each scrape).",
             group_by=ch_dims,
-            sort_by="Bytes Sent/s",
+            sort_by="Bytes Sent",
         ),
         ChartDef(
             f"{PREFIX} Unified messaging backlog",

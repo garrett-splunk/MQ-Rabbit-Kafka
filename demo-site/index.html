@@ -873,10 +873,8 @@ bash scripts/warm-mq-dashboard.sh</code></pre>
           <tbody>
             <tr><td><code>Depth</code> / <code>Depth %</code></td><td>Low on ORDER.REQ</td><td>Climbs toward max</td><td>“Capacity view — same as Dynatrace depth %”</td></tr>
             <tr><td><code>Oldest Msg (s)</code></td><td>0 on empty queues</td><td>600+ on ORDER.REQ</td><td>“SLA clock — IBM MQ sends <code>-1</code> when empty; dashboard clamps to 0”</td></tr>
-            <tr><td><code>Enqueue/min</code> · <code>Dequeue/min</code></td><td>Both &gt; 0 after warm-up</td><td>Enqueue &gt; dequeue</td><td>“Producer vs consumer throughput in one row”</td></tr>
-            <tr><td><code>Net flow/min</code></td><td>≈ 0</td><td>Positive</td><td>“Backlog building — alert candidate”</td></tr>
-            <tr><td><code>Connections</code> (QM)</td><td>10–30</td><td>Stable</td><td>“Broker not the bottleneck”</td></tr>
-            <tr><td><code>Bytes Sent/s</code> (channel)</td><td>&gt; 0 on DEV.APP.SVRCONN</td><td>Still &gt; 0</td><td>“Apps still talking to MQ — channel is fine”</td></tr>
+            <tr><td><code>Bytes Sent</code> / <code>Bytes Received</code> (channel/QM)</td><td>10k–40k when sidecar/apps active</td><td>Still &gt; 0 during backlog</td><td>Session byte totals — not rate(); sidecar reconnects every 15s</td></tr>
+            <tr><td><code>Enqueue/min</code> · <code>Dequeue/min</code></td><td>Both &gt; 0 after warm-up</td><td>Enqueue &gt; dequeue (consumer stopped)</td><td>Sum of 15s interval counts over 5m — static backlog alone shows 0</td></tr>
           </tbody>
         </table>
 

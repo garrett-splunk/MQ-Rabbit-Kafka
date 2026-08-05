@@ -41,8 +41,8 @@ done
 echo
 echo "== Ready =="
 echo "  Wait ~60s, then open IBM MQ Ops dashboard (last 15 min)."
-echo "  Queue table: Depth, Oldest Msg, Enqueue/min, Dequeue/min should be populated."
-echo "  QM + Channel tables: Connections, byte rates after groupBy fix + this load."
+echo "  Queue table: Enqueue/min and Dequeue/min need traffic in the last 5 min (not a static backlog)."
+echo "  QM + Channel tables: Bytes Sent/Received show session totals (~15k+ when sidecar is active)."
 echo
 echo "  Optional backlog story: bash scripts/demo-incident-mq-backlog.sh"
 echo "  Re-warm after incident: bash scripts/warm-mq-dashboard.sh"
