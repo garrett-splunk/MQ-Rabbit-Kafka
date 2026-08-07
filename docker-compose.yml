@@ -160,6 +160,7 @@ services:
       context: .
       dockerfile: services/order-consumer/Dockerfile
     env_file: .env
+    restart: unless-stopped
     environment:
       <<: [*otel-environment, *mq-environment]
       OTEL_SERVICE_NAME: order-consumer

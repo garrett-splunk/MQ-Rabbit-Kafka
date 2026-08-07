@@ -24,6 +24,12 @@ fi
 docker compose start order-consumer 2>/dev/null || true
 bash scripts/enable-mq-queue-monitoring.sh 2>/dev/null || true
 
+echo "Activating DEV.APP.SVRCONN channel row (status + bytes)..."
+bash scripts/warm-mq-channels.sh 12 2>/dev/null || true
+
+echo "Seeding DEV.QUEUE.* rows (depth + oldest age for dashboard table)..."
+bash scripts/load-dev-queues.sh 3 2>/dev/null || true
+
 echo "Initial burst (MQ + Kafka + Rabbit)..."
 bash scripts/load-messaging-demo.sh --mq "$MQ_ORDERS" --kafka 25 --rabbit 15
 
@@ -41,7 +47,9 @@ done
 echo
 echo "== Ready =="
 echo "  Wait ~60s, then open IBM MQ Ops dashboard (last 15 min)."
-echo "  Queue table: Enqueue/min and Dequeue/min need traffic in the last 5 min (not a static backlog)."
+echo "  ORDER.REQ: enqueue/min and dequeue/min need traffic in the last 5 min."
+echo "  DEV.QUEUE.*: depth and oldest msg stay > 0 (no consumer); enqueue/min from seed puts."
+echo "  Channel table: DEV.APP.SVRCONN needs order-consumer running; MQOTEL from sidecar."
 echo "  QM + Channel tables: Bytes Sent/Received show session totals (~15k+ when sidecar is active)."
 echo
 echo "  Optional backlog story: bash scripts/demo-incident-mq-backlog.sh"

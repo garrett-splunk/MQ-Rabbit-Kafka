@@ -46,6 +46,7 @@
         <li><a href="#dynatrace-map" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Dynatrace mapping</a></li>
         <li><a href="#splunk-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">📊</span> Splunk setup</a></li>
         <li><a href="#mq-dashboard-tables" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">▦</span> Dashboard tables</a></li>
+        <li><a href="#workshop-runbook" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">▶</span> Workshop runbook</a></li>
         <li><a href="#splunk-views" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Splunk cheat sheet</a></li>
         <li><a href="#metrics-glossary" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">📖</span> Metrics &amp; 101</a></li>
         <li><a href="#facilitator-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⚙</span> Facilitator setup</a></li>
@@ -848,23 +849,109 @@ docker compose logs ibm-mq-java-metrics --tail 15</code></pre>
         </figure>
 
         <div class="callout callout--warning">
-          <p class="callout__title">Fix before the room (2 commands)</p>
+          <p class="callout__title">Fix before the room — one command block</p>
+          <p>Run <strong>~3 minutes before showtime</strong> (tables use 5-minute averages). See <a href="#workshop-runbook">Workshop runbook</a> for what each step does.</p>
           <div class="code-block">
-            <div class="code-block__header"><span>Terminal</span><button class="btn-copy" data-copy="cmd-warm-dashboard">Copy</button></div>
-            <pre><code id="cmd-warm-dashboard"># Per-table groupBy + 5m averages (run each line separately)
+            <div class="code-block__header"><span>Terminal — main warm-up (copy all lines)</span><button class="btn-copy" data-copy="cmd-warm-dashboard">Copy</button></div>
+            <pre><code id="cmd-warm-dashboard">cd MQ-Rabbit-Kafka
+python3 scripts/verify-splunk-token-org.py
 python3 scripts/provision-splunk-mq-ops.py
-# ~2 min sustained orders — run ~3 min before showtime
 bash scripts/warm-mq-dashboard.sh</code></pre>
           </div>
           <p>Re-open the dashboard with time range <strong>Last 15 minutes</strong>. Tables should show one row per queue/QM/channel with numeric columns filled.</p>
         </div>
 
+        <h4 id="workshop-runbook">Workshop runbook — commands &amp; what they mean</h4>
+        <p>Use this as your presenter cheat sheet. <code>warm-mq-dashboard.sh</code> runs the seed scripts below automatically; run them individually when you only need to refresh one table.</p>
+
+        <div class="code-block">
+          <div class="code-block__header"><span>First-time / broken dashboards</span><button class="btn-copy" data-copy="cmd-runbook-setup">Copy</button></div>
+          <pre><code id="cmd-runbook-setup">cp .env.splunk.example .env.splunk
+docker compose up -d
+docker compose up -d --force-recreate otel-collector ibm-mq-java-metrics
+python3 scripts/verify-splunk-token-org.py
+bash scripts/validate-splunk-pipeline.sh
+python3 scripts/provision-splunk-mq-ops.py</code></pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-block__header"><span>Before every demo (~3 min)</span><button class="btn-copy" data-copy="cmd-runbook-warm">Copy</button></div>
+          <pre><code id="cmd-runbook-warm">bash scripts/warm-mq-dashboard.sh</code></pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-block__header"><span>Refresh individual table rows (optional)</span><button class="btn-copy" data-copy="cmd-runbook-partial">Copy</button></div>
+          <pre><code id="cmd-runbook-partial">bash scripts/warm-mq-channels.sh
+bash scripts/load-dev-queues.sh
+bash scripts/load-messaging-demo.sh --mq 30</code></pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-block__header"><span>Three-act story (live room)</span><button class="btn-copy" data-copy="cmd-runbook-story">Copy</button></div>
+          <pre><code id="cmd-runbook-story">bash scripts/warm-mq-dashboard.sh
+bash scripts/demo-incident-mq-backlog.sh
+bash scripts/load-messaging-demo.sh --mq 20
+bash scripts/warm-mq-channels.sh
+docker compose start order-consumer</code></pre>
+        </div>
+
+        <table class="info-table">
+          <thead><tr><th>Command</th><th>What it does</th><th>Dashboard effect</th></tr></thead>
+          <tbody>
+            <tr><td><code>verify-splunk-token-org.py</code></td><td>Posts a test metric with ingest token, queries with API token</td><td>Nothing visible — prevents “empty dashboard” when tokens are from different orgs</td></tr>
+            <tr><td><code>validate-splunk-pipeline.sh</code></td><td>Checks collector health + recent <code>ibm.mq.*</code> dimensions in Splunk</td><td>Confirms metrics are indexed before you open charts</td></tr>
+            <tr><td><code>provision-splunk-mq-ops.py</code></td><td>Creates/updates IBM MQ Ops dashboard + <code>[MQ Demo]</code> detectors</td><td>Charts, tables, SignalFlow (per-table <code>groupBy</code>, 5m averages)</td></tr>
+            <tr><td><code>enable-mq-queue-monitoring.sh</code></td><td><code>MONQ(LOW)</code> on ORDER.* and DEV.QUEUE.*</td><td>Enables <code>ibm.mq.oldest.msg.age</code> — without MONQ, oldest-msg column stays 0</td></tr>
+            <tr><td><code>warm-mq-channels.sh</code></td><td>Starts <code>order-consumer</code> + sends orders via producer</td><td><strong>Channel table:</strong> <code>DEV.APP.SVRCONN</code> status ≈ 3 (running), bytes &gt; 0</td></tr>
+            <tr><td><code>load-dev-queues.sh</code></td><td>PUTs sample messages to <code>DEV.QUEUE.1/2/3</code> via <code>amqsput</code></td><td><strong>Queue table:</strong> DEV rows get depth, oldest msg, enqueue/min (no consumer on these queues)</td></tr>
+            <tr><td><code>warm-mq-dashboard.sh</code></td><td>Runs all of the above + 2 min sustained order flow</td><td>Fills queue, QM, and channel tables for steady-state Act 1</td></tr>
+            <tr><td><code>demo-incident-mq-backlog.sh</code></td><td>Stops consumer, loads orders</td><td>Act 2: <code>ORDER.REQ</code> depth ↑, oldest age ↑, net flow/min positive</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--info">
+          <p class="callout__title">Why two channels in the table?</p>
+          <p><code>MQOTEL.SVRCONN</code> — metrics sidecar (<code>ibm-mq-java-metrics</code>) reconnects every 15s; always shows status + bytes.<br />
+          <code>DEV.APP.SVRCONN</code> — sample apps (<code>order-producer</code> / <code>order-consumer</code>); only active while consumer is running and orders flow. Stopping consumer for the backlog demo clears this row until you run <code>warm-mq-channels.sh</code> again.</p>
+        </div>
+
+        <h4>What each table column means</h4>
+        <table class="info-table">
+          <thead><tr><th>Table</th><th>Column</th><th>Metric / logic</th><th>Healthy demo</th><th>Say this</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="6">Queue inventory</td><td><code>Depth</code></td><td><code>ibm.mq.queue.depth</code></td><td>Low on ORDER.REQ; 4–6 on DEV.QUEUE.*</td><td>“Messages waiting right now”</td></tr>
+            <tr><td><code>Depth %</code></td><td>depth ÷ max depth × 100</td><td>Near 0% on ORDER.REQ</td><td>“Same capacity view as Dynatrace depth %”</td></tr>
+            <tr><td><code>Oldest Msg (s)</code></td><td><code>ibm.mq.oldest.msg.age</code> (clamped ≥ 0)</td><td>0 on empty ORDER.REQ; &gt; 0 on DEV queues</td><td>“SLA clock — needs MONQ + messages on queue”</td></tr>
+            <tr><td><code>Enqueue/min</code></td><td>sum of 15s PUT counts over 5m ÷ 5</td><td>&gt; 0 when traffic in last 5 min</td><td>“Producer throughput — not lifetime total”</td></tr>
+            <tr><td><code>Dequeue/min</code></td><td>sum of 15s GET counts over 5m ÷ 5</td><td>&gt; 0 on ORDER.REQ with consumer up; 0 on DEV queues</td><td>“Consumer throughput”</td></tr>
+            <tr><td><code>Net flow/min</code></td><td>enqueue − dequeue</td><td>≈ 0 healthy; positive = backlog building</td><td>“One number for ‘is the queue draining?’”</td></tr>
+            <tr><td rowspan="4">QM overview</td><td><code>QM Status</code></td><td><code>ibm.mq.manager.status</code></td><td>Running</td><td>“Broker up”</td></tr>
+            <tr><td><code>Connections</code></td><td><code>ibm.mq.connection.count</code></td><td>10–30</td><td>“Client + sidecar connections”</td></tr>
+            <tr><td><code>Active Channels</code></td><td><code>ibm.mq.manager.active.channels</code></td><td>≥ 2 when apps + sidecar active</td><td>“SVRCONN instances in use”</td></tr>
+            <tr><td><code>Bytes Sent/Received</code></td><td><code>ibm.mq.byte.*</code> 5m mean</td><td>10k–40k</td><td>“QM-level byte totals this session”</td></tr>
+            <tr><td rowspan="3">Channel status</td><td><code>Channel Status</code></td><td><code>ibm.mq.status</code> (3 = running)</td><td>3 on both SVRCONNs</td><td>“Channel instance alive — not the same as queue depth”</td></tr>
+            <tr><td><code>Bytes Sent</code></td><td><code>ibm.mq.byte.sent</code></td><td>&gt; 0 on DEV.APP + MQOTEL</td><td>“Traffic on this channel”</td></tr>
+            <tr><td><code>Bytes Received</code></td><td><code>ibm.mq.byte.received</code></td><td>&gt; 0 on DEV.APP + MQOTEL</td><td>“Inbound channel bytes”</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">How to show it in the room (click path)</p>
+          <ol class="show-steps">
+            <li>Splunk O11y → <strong>Dashboards</strong> → <strong>IBM MQ Ops — Messaging Demo</strong> · time range <strong>Last 15 min</strong></li>
+            <li>Scroll to <strong>Queue inventory</strong> — point at <code>ORDER.REQ</code> (live app flow) vs <code>DEV.QUEUE.*</code> (seeded sample rows)</li>
+            <li>Scroll to <strong>Channel status</strong> — <code>DEV.APP.SVRCONN</code> = apps, <code>MQOTEL.SVRCONN</code> = observability sidecar</li>
+            <li>Act 2: run backlog script → refresh → same tables, watch <code>ORDER.REQ</code> depth and net flow/min</li>
+            <li>Act 3: <code>bash scripts/warm-mq-channels.sh</code> → APM → <code>order-producer</code> / <code>order-consumer</code> traces on same time range</li>
+          </ol>
+        </div>
+
         <div class="callout callout--concept">
           <p class="callout__title">Three-act table story (say this while clicking)</p>
           <ol class="show-steps">
-            <li><strong>Act 1 — Steady state (healthy):</strong> After <code>warm-mq-dashboard.sh</code>, queue table shows <code>ORDER.REQ</code> depth near 0, enqueue/min ≈ dequeue/min, net flow/min ≈ 0. QM row: connections &gt; 0, active channels ≥ 2. Channel row: <code>DEV.APP.SVRCONN</code> (apps) + <code>MQOTEL.SVRCONN</code> (metrics sidecar) both status <em>running</em>, bytes/s &gt; 0. <em>“Same inventory view as Dynatrace MQ extension — one pane for every queue.”</em></li>
-            <li><strong>Act 2 — Incident (consumer down):</strong> <code>bash scripts/demo-incident-mq-backlog.sh</code> then <code>load-messaging-demo --mq 20</code>. Watch <code>ORDER.REQ</code> row: depth climbs (50+), oldest msg (s) rises, enqueue/min &gt;&gt; dequeue/min, <strong>net flow/min turns positive</strong> — producer still PUTting, consumer absent. QM connections stay flat; channel bytes on <code>DEV.APP.SVRCONN</code> still move. <em>“Table tells you which queue and whether puts or gets stopped — before you open a single trace.”</em></li>
-            <li><strong>Act 3 — Recovery + Splunk differentiator:</strong> <code>docker compose start order-consumer</code>. Depth and oldest age fall; net flow returns to ~0. Pivot same time range to <strong>APM → order-producer</strong> (<code>mq.put.order</code>) vs <strong>order-consumer</strong> (<code>mq.get.order</code> returns). <em>“Dynatrace shows the queue; Splunk links the queue row to the service that stopped getting.”</em></li>
+            <li><strong>Act 1 — Steady state (healthy):</strong> After <code>warm-mq-dashboard.sh</code>, queue table shows <code>ORDER.REQ</code> depth near 0, enqueue/min ≈ dequeue/min, net flow/min ≈ 0; <code>DEV.QUEUE.*</code> rows show small backlog (depth + oldest msg). QM row: connections &gt; 0, active channels ≥ 2. Channel row: <code>DEV.APP.SVRCONN</code> (apps) + <code>MQOTEL.SVRCONN</code> (metrics sidecar) both status <em>running</em>, bytes &gt; 0. <em>“Same inventory view as Dynatrace MQ extension — one pane for every queue and channel.”</em></li>
+            <li><strong>Act 2 — Incident (consumer down):</strong> <code>bash scripts/demo-incident-mq-backlog.sh</code> then <code>bash scripts/load-messaging-demo.sh --mq 20</code>. Watch <code>ORDER.REQ</code> row: depth climbs (50+), oldest msg (s) rises, enqueue/min &gt;&gt; dequeue/min, <strong>net flow/min turns positive</strong> — producer still PUTting, consumer absent. <code>DEV.APP.SVRCONN</code> may go inactive (status 0) until recovery. <em>“Table tells you which queue and whether puts or gets stopped — before you open a single trace.”</em></li>
+            <li><strong>Act 3 — Recovery + Splunk differentiator:</strong> <code>bash scripts/warm-mq-channels.sh</code> (or <code>docker compose start order-consumer</code> + orders). Depth and oldest age fall; net flow returns to ~0; <code>DEV.APP.SVRCONN</code> row repopulates. Pivot same time range to <strong>APM → order-producer</strong> (<code>mq.put.order</code>) vs <strong>order-consumer</strong> (<code>mq.get.order</code> returns). <em>“Dynatrace shows the queue; Splunk links the queue row to the service that stopped getting.”</em></li>
           </ol>
         </div>
 
@@ -872,9 +959,12 @@ bash scripts/warm-mq-dashboard.sh</code></pre>
           <thead><tr><th>Table column</th><th>Healthy demo</th><th>During backlog incident</th><th>Say this</th></tr></thead>
           <tbody>
             <tr><td><code>Depth</code> / <code>Depth %</code></td><td>Low on ORDER.REQ</td><td>Climbs toward max</td><td>“Capacity view — same as Dynatrace depth %”</td></tr>
-            <tr><td><code>Oldest Msg (s)</code></td><td>0 on empty queues</td><td>600+ on ORDER.REQ</td><td>“SLA clock — IBM MQ sends <code>-1</code> when empty; dashboard clamps to 0”</td></tr>
-            <tr><td><code>Bytes Sent</code> / <code>Bytes Received</code> (channel/QM)</td><td>10k–40k when sidecar/apps active</td><td>Still &gt; 0 during backlog</td><td>Session byte totals — not rate(); sidecar reconnects every 15s</td></tr>
-            <tr><td><code>Enqueue/min</code> · <code>Dequeue/min</code></td><td>Both &gt; 0 after warm-up</td><td>Enqueue &gt; dequeue (consumer stopped)</td><td>Sum of 15s interval counts over 5m — static backlog alone shows 0</td></tr>
+            <tr><td><code>Oldest Msg (s)</code></td><td>0 on empty ORDER.REQ; &gt; 0 on DEV.QUEUE.*</td><td>600+ on ORDER.REQ</td><td>“SLA clock — IBM MQ sends <code>-1</code> when empty; dashboard clamps to 0”</td></tr>
+            <tr><td><code>Bytes Sent</code> / <code>Bytes Received</code> (channel/QM)</td><td>10k–40k when sidecar/apps active</td><td>Producer bytes on DEV.APP may drop if consumer stopped</td><td>Session byte totals — not rate(); sidecar reconnects every 15s</td></tr>
+            <tr><td><code>Enqueue/min</code> · <code>Dequeue/min</code></td><td>Both &gt; 0 after warm-up on ORDER.REQ</td><td>Enqueue &gt; dequeue (consumer stopped)</td><td>Sum of 15s interval counts over 5m — static backlog alone shows 0</td></tr>
+            <tr><td><code>Net flow/min</code></td><td>≈ 0</td><td>Positive</td><td>“Backlog building — alert candidate”</td></tr>
+            <tr><td><code>Connections</code> (QM)</td><td>10–30</td><td>Stable</td><td>“Broker not the bottleneck”</td></tr>
+            <tr><td><code>Channel Status</code></td><td>3 (running) on DEV.APP + MQOTEL</td><td>DEV.APP may be 0 if consumer stopped</td><td>“App channel vs metrics channel — different failure modes”</td></tr>
           </tbody>
         </table>
 
@@ -1272,13 +1362,13 @@ docker compose logs otel-collector --tail 20</code></pre>
               <pre><code id="cmd-start">git clone https://github.com/garrett-splunk/MQ-Rabbit-Kafka.git
 cd MQ-Rabbit-Kafka
 cp .env.splunk.example .env.splunk
-# Edit .env.splunk — SPLUNK_ACCESS_TOKEN + SPLUNK_API_TOKEN (same org)
+docker compose up -d
+python3 scripts/verify-splunk-token-org.py
 bash scripts/validate-splunk-pipeline.sh
 python3 scripts/provision-splunk-mq-ops.py
-bash scripts/warm-mq-dashboard.sh
-bash scripts/run-demo.sh</code></pre>
+bash scripts/warm-mq-dashboard.sh</code></pre>
             </div>
-            <p>Full token setup: <a href="#splunk-token">Splunk access token</a> · Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>
+            <p>Command reference: <a href="#workshop-runbook">Workshop runbook</a> · Full token setup: <a href="#splunk-token">Splunk access token</a> · Local demo site: <a href="http://localhost:8092">http://localhost:8092</a> · MQ console: <a href="http://localhost:9443/ibmmq/console">http://localhost:9443/ibmmq/console</a> · RabbitMQ UI: <a href="http://localhost:15672">http://localhost:15672</a> (demo / passw0rd)</p>
           </div>
         </details>
 
