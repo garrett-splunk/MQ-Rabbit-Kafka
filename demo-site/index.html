@@ -47,6 +47,7 @@
         <li><a href="#splunk-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">📊</span> Splunk setup</a></li>
         <li><a href="#mq-dashboard-tables" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">▦</span> Dashboard tables</a></li>
         <li><a href="#workshop-runbook" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">▶</span> Workshop runbook</a></li>
+        <li><a href="#apm-presenter-script" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">💬</span> APM talk track</a></li>
         <li><a href="#splunk-views" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">—</span> Splunk cheat sheet</a></li>
         <li><a href="#metrics-glossary" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">📖</span> Metrics &amp; 101</a></li>
         <li><a href="#facilitator-setup" class="sidebar-tree__link" data-step="0"><span class="sidebar-tree__num">⚙</span> Facilitator setup</a></li>
@@ -942,8 +943,104 @@ docker compose start order-consumer</code></pre>
             <li>Scroll to <strong>Queue inventory</strong> — point at <code>ORDER.REQ</code> (live app flow) vs <code>DEV.QUEUE.*</code> (seeded sample rows)</li>
             <li>Scroll to <strong>Channel status</strong> — <code>DEV.APP.SVRCONN</code> = apps, <code>MQOTEL.SVRCONN</code> = observability sidecar</li>
             <li>Act 2: run backlog script → refresh → same tables, watch <code>ORDER.REQ</code> depth and net flow/min</li>
-            <li>Act 3: <code>bash scripts/warm-mq-channels.sh</code> → APM → <code>order-producer</code> / <code>order-consumer</code> traces on same time range</li>
+            <li>Act 3: <code>bash scripts/warm-mq-channels.sh</code> → <a href="#apm-presenter-script">APM talk track</a> on same time range</li>
           </ol>
+        </div>
+
+        <h4 id="apm-presenter-script">What to say — APM section</h4>
+        <p>Pivot here after the dashboard three-act story (especially Act 2 backlog or Act 3 recovery). Keep the <strong>same time range</strong> (<code>Last 15 min</code>) and filter <code>deployment.environment.name:messaging-demo-lab</code> so metrics and traces line up.</p>
+
+        <div class="code-block">
+          <div class="code-block__header"><span>Before APM — send one tagged order (optional)</span><button class="btn-copy" data-copy="cmd-apm-runbook">Copy</button></div>
+          <pre><code id="cmd-apm-runbook">CORR_ID="demo-$(date +%s)"
+curl -s -X POST http://localhost:8080/orders \
+  -H "Content-Type: application/json" \
+  -H "X-Correlation-Id: ${CORR_ID}" \
+  -d '{"productId":"SKU-DEMO","quantity":1}'
+echo "Correlation ID: ${CORR_ID}"</code></pre>
+        </div>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">Bridge from dashboard → APM (30 seconds)</p>
+          <p class="value-line"><strong>Say this:</strong> “The queue table told us <em>ORDER.REQ</em> is building and puts still exceed gets. That’s infrastructure. Now I’ll show <em>which service</em> stopped consuming — without leaving Splunk or opening the MQ console.”</p>
+          <p>Click: <strong>APM → Service map</strong> (same time window). Point at <code>order-producer</code>, <code>inventory-service</code>, <code>order-consumer</code>, and the MQ edge.</p>
+        </div>
+
+        <table class="info-table">
+          <thead><tr><th>Scene</th><th>Where to click</th><th>What to say</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Act 1 — Healthy</strong></td>
+              <td>APM → Service map · both services green</td>
+              <td>“Producer PUTs, consumer GETs — same pattern as your Dynatrace service flow. MQ metrics come from the sidecar; spans come from the apps. One tenant, one time range.”</td>
+            </tr>
+            <tr>
+              <td><strong>Act 2 — Backlog</strong></td>
+              <td>APM → Services → <code>order-producer</code> → Traces</td>
+              <td>“Depth is rising on the dashboard, but look — producer traces still show <code>POST /orders</code> → <code>inventory.check</code> → <code>mq.put.order</code>. The app team is still publishing.”</td>
+            </tr>
+            <tr>
+              <td><strong>Act 2 — Backlog</strong></td>
+              <td>APM → Services → <code>order-consumer</code> → Traces</td>
+              <td>“No new <code>mq.get.order</code> spans in this window — consumer is down or stuck. That’s not a queue-manager problem; route to the team that owns <code>order-consumer</code>.”</td>
+            </tr>
+            <tr>
+              <td><strong>Act 3 — Recovery</strong></td>
+              <td>Dashboard depth falling + consumer traces return</td>
+              <td>“We restarted the consumer — GET spans are back, depth drains. Detector clears. Same runbook shape as your MQ extension alert, plus the service that actually failed.”</td>
+            </tr>
+            <tr>
+              <td><strong>Business ticket</strong></td>
+              <td>APM → Traces · search <code>CORR_ID</code></td>
+              <td>“Async MQ means two trace trees, one business ID. I search the correlation ID on producer and consumer — no guessing which pod or queue.”</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — expand one producer trace</p>
+          <ol class="show-steps">
+            <li><strong>APM → Traces</strong> · service <code>order-producer</code> · last 15 min</li>
+            <li>Open a trace → expand <code>POST /orders</code> → <code>inventory.check</code> → <code>mq.put.order</code></li>
+            <li>Point at attributes: <code>messaging.system = ibmmq</code>, <code>messaging.destination.name = ORDER.REQ</code></li>
+          </ol>
+          <p class="value-line"><strong>Say this:</strong> “This span is the PUT your ops team cares about — same queue name as the dashboard row, but now I know it was <code>order-producer</code>, not a batch job or a rogue client.”</p>
+        </div>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — same order on the consumer (two trees)</p>
+          <ol class="show-steps">
+            <li><strong>APM → Traces</strong> · service <code>order-consumer</code> · search the <code>CORR_ID</code> from terminal</li>
+            <li>Expand <code>mq.get.order</code> → <code>inventory.fulfill</code></li>
+            <li>Point at <code>order.id</code> on the fulfill span (= correlation ID)</li>
+          </ol>
+          <p class="value-line"><strong>Say this:</strong> “MQ doesn’t stitch these into one trace in this lab — that’s normal for async. Splunk links them with the business ID. In production you can add trace context propagation over MQ if you want a single tree.”</p>
+        </div>
+
+        <div class="callout callout--show">
+          <p class="callout__title">Show this — backlog incident click path (pairs with Act 2)</p>
+          <ol class="show-steps">
+            <li>Dashboard: <code>ORDER.REQ</code> depth ↑, net flow/min positive</li>
+            <li><strong>APM → Services → order-producer</strong> — fresh <code>mq.put.order</code> spans</li>
+            <li><strong>APM → Services → order-consumer</strong> — gap in <code>mq.get.order</code></li>
+            <li><strong>APM → Service map</strong> — producer edge to MQ active; consumer quiet</li>
+          </ol>
+          <p class="value-line"><strong>Say this:</strong> “Alert on <code>ibm.mq.queue.depth</code> for <code>ORDER.REQ</code> → same session → producer still PUTting → consumer has no GET. Consumer problem, not broker.”</p>
+        </div>
+
+        <div class="callout callout--tip">
+          <p class="callout__title">Presenter notes — don’t over-promise</p>
+          <ul>
+            <li>Producer and consumer are <strong>separate traces</strong> unless you add W3C context over MQ — link with <code>X-Correlation-Id</code> / <code>order.id</code>.</li>
+            <li>Channel table (<code>DEV.APP.SVRCONN</code>) = connectivity; APM = which <em>service</em> used that channel for PUT/GET.</li>
+            <li>If traces are empty, confirm <code>order-producer</code> / <code>order-consumer</code> are up and send a few orders: <code>bash scripts/warm-mq-channels.sh</code>.</li>
+          </ul>
+        </div>
+
+        <div class="callout callout--concept">
+          <p class="callout__title">Closing line (after APM)</p>
+          <p class="value-line"><strong>Say this:</strong> “Dynatrace MQ extension shows the queue and channel. Splunk shows the same inventory view <em>and</em> the service that stopped getting — plus Kafka lag and Rabbit ready in one on-call queue. Same symptom, one runbook.”</p>
+          <p class="muted">Full click-path detail: <a href="#correlation-drill">Correlation drill</a> · Demo script: <a href="#demo-script">Demo 3 — trace correlation</a></p>
         </div>
 
         <div class="callout callout--concept">
